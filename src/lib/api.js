@@ -203,4 +203,25 @@ export const inventoryApi = {
   },
 };
 
+// Bank Details API
+export const bankDetailsApi = {
+  // Get all bank details
+  getAll: async () => {
+    const response = await api.get('/bankDetails');
+    return response.data;
+  },
+
+  // Update bank detail (e.g. status)
+  update: async (id, data) => {
+    const response = await api.put(`/bankDetails/${id}`, data);
+    return response.data;
+  },
+
+  // Delete bank detail
+  delete: async (id) => {
+    const response = await api.delete(`/bankDetails/${id}`);
+    return response.data;
+  }
+};
+
 export default api;
