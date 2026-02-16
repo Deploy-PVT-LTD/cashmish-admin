@@ -2,8 +2,12 @@ import { useState, useEffect } from 'react';
 import { AdminLayout } from '@/components/layout/AdminLayout';
 import { bankDetailsApi } from '@/lib/api';
 import { toast } from 'sonner';
-import { Loader2, Trash2, CheckCircle, Clock, XCircle } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import {
+    Dialog,
+    DialogContent,
+    DialogHeader,
+    DialogTitle,
+} from "@/components/ui/dialog";
 import {
     AlertDialog,
     AlertDialogAction,
@@ -14,12 +18,16 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import { Landmark, User, CreditCard, Eye, Loader2, Trash2, CheckCircle, Clock, XCircle } from 'lucide-react';
 
 export default function BankDetails() {
     const [details, setDetails] = useState([]);
     const [loading, setLoading] = useState(true);
     const [detailToDelete, setDetailToDelete] = useState(null);
+    const [selectedDetail, setSelectedDetail] = useState(null);
+    const [viewModalOpen, setViewModalOpen] = useState(false);
 
     const fetchBankDetails = async () => {
         try {
@@ -159,6 +167,18 @@ export default function BankDetails() {
                                                 <Button
                                                     variant="ghost"
                                                     size="sm"
+                                                    onClick={() => {
+                                                        setSelectedDetail(item);
+                                                        setViewModalOpen(true);
+                                                    }}
+                                                    title="View Details"
+                                                    className="text-primary hover:text-primary hover:bg-primary/10"
+                                                >
+                                                    <Eye className="w-4 h-4" />
+                                                </Button>
+                                                <Button
+                                                    variant="ghost"
+                                                    size="sm"
                                                     onClick={() => setDetailToDelete(item)}
                                                     className="text-destructive hover:text-destructive hover:bg-destructive/10"
                                                 >
@@ -173,6 +193,67 @@ export default function BankDetails() {
                     </div>
                 </div>
             )}
+
+            {/* View Details Modal */}
+            <Dialog open={viewModalOpen} onOpenChange={setViewModalOpen}>
+                <DialogContent className="max-w-2xl bg-card">
+                    <DialogHeader>
+                        <DialogTitle className="flex items-center gap-2 text-xl font-bold">
+                            <CreditCard className="w-6 h-6 text-primary" />
+                            Bank Request Details
+                        </DialogTitle>
+                    </DialogHeader>
+                    {selectedDetail && (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 py-4">
+                            {/* User Section */}
+                            <div className="space-y-4">
+                                <h4 className="text-sm font-semibold text-muted-foreground uppercase flex items-center gap-2">
+                                    <User className="w-4 h-4" /> User Information
+                                </h4>
+                                <div className="space-y-3 bg-muted/30 p-4 rounded-lg border">
+                                    <div>
+                                        <span className="text-xs text-muted-foreground block font-semibold">Full Name</span>
+                                        <span className="font-medium">{selectedDetail.userId?.name || 'N/A'}</span>
+                                    </div>
+                                    <div>
+                                        <span className="text-xs text-muted-foreground block font-semibold">Email Address</span>
+                                        <span className="font-medium">{selectedDetail.userId?.email || 'N/A'}</span>
+                                    </div>
+                                    <div>
+                                        <span className="text-xs text-muted-foreground block font-semibold">Status</span>
+                                        <div className="mt-1">{getStatusBadge(selectedDetail.status)}</div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Bank Section */}
+                            <div className="space-y-4">
+                                <h4 className="text-sm font-semibold text-muted-foreground uppercase flex items-center gap-2">
+                                    <Landmark className="w-4 h-4" /> Bank Information
+                                </h4>
+                                <div className="space-y-3 bg-muted/30 p-4 rounded-lg border">
+                                    <div>
+                                        <span className="text-xs text-muted-foreground block font-semibold">Bank Name</span>
+                                        <span className="font-medium">{selectedDetail.bankName}</span>
+                                    </div>
+                                    <div>
+                                        <span className="text-xs text-muted-foreground block font-semibold">Account Holder</span>
+                                        <span className="font-medium">{selectedDetail.accountHolderName}</span>
+                                    </div>
+                                    <div>
+                                        <span className="text-xs text-muted-foreground block font-semibold">Account Number</span>
+                                        <span className="font-mono font-bold text-primary tracking-wider break-all">{selectedDetail.accountNumber}</span>
+                                    </div>
+                                    <div>
+                                        <span className="text-xs text-muted-foreground block font-semibold">Submitted On</span>
+                                        <span className="text-sm">{new Date(selectedDetail.createdAt).toLocaleString()}</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                </DialogContent>
+            </Dialog>
 
             {/* Delete Confirmation */}
             <AlertDialog open={!!detailToDelete} onOpenChange={() => setDetailToDelete(null)}>
