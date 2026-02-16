@@ -341,7 +341,7 @@ export default function Bids() {
       {/* Info Note */}
       {/* <div className="mt-6 p-4 bg-info/10 border border-info/20 rounded-lg">
         <p className="text-sm text-info">
-          <strong>API Connected:</strong> Bids fetched from <code className="bg-muted px-1 rounded">http://localhost:5000/api/forms</code>
+          <strong>API Connected:</strong> Bids fetched from <code className="bg-muted px-1 rounded">https://cashmish-backend.onrender.com/api/forms</code>
         </p>
       </div> */}
     </AdminLayout>
