@@ -361,7 +361,7 @@ export default function Submissions() {
                               <DollarSign className="w-4 h-4" />
                             </Button>
                           )}
-                          {submission.bidPrice > 0 && (
+                          {submission.bidPrice > 0 && submission.status !== 'accepted' && (
                             <Button variant="ghost" size="sm" className="text-warning hover:text-warning" onClick={() => openBidModal(submission, true)}>
                               <Pencil className="w-4 h-4" />
                             </Button>
@@ -507,17 +507,19 @@ export default function Submissions() {
                     <span className="text-foreground font-medium">Your Bid</span>
                     <div className="flex items-center gap-2">
                       <span className="text-2xl font-bold text-info">${selectedSubmission.bidPrice?.toLocaleString()}</span>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="text-warning hover:text-warning"
-                        onClick={() => {
-                          setSelectedSubmission(null);
-                          openBidModal(selectedSubmission, true);
-                        }}
-                      >
-                        <Pencil className="w-4 h-4" />
-                      </Button>
+                      {selectedSubmission.status !== 'accepted' && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="text-warning hover:text-warning"
+                          onClick={() => {
+                            setSelectedSubmission(null);
+                            openBidModal(selectedSubmission, true);
+                          }}
+                        >
+                          <Pencil className="w-4 h-4" />
+                        </Button>
+                      )}
                     </div>
                   </div>
                 )}
@@ -538,14 +540,6 @@ export default function Submissions() {
                     Place Bid
                   </Button>
                   <Button
-                    className="flex-1 bg-primary hover:bg-primary-hover text-primary-foreground"
-                    onClick={() => updateStatus(selectedSubmission._id, 'accepted')}
-                    disabled={updating}
-                  >
-                    {updating ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
-                    Accept
-                  </Button>
-                  <Button
                     variant="outline"
                     className="flex-1 border-destructive text-destructive hover:bg-destructive hover:text-destructive-foreground"
                     onClick={() => updateStatus(selectedSubmission._id, 'rejected')}
@@ -558,7 +552,7 @@ export default function Submissions() {
               )}
 
               {/* Edit Bid Button for already bid items */}
-              {selectedSubmission.bidPrice > 0 && (
+              {selectedSubmission.bidPrice > 0 && selectedSubmission.status !== 'accepted' && (
                 <Button
                   variant="outline"
                   className="w-full"
