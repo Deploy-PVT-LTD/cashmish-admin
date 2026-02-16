@@ -107,7 +107,7 @@ export function AdminSidebar({ collapsed, setCollapsed }) {
           </div>
           {!collapsed && (
             <div className="flex flex-col min-w-0">
-              <span className="font-semibold text-sidebar-accent-foreground truncate">Reseller</span>
+              <span className="font-semibold text-sidebar-accent-foreground truncate">Cashmish</span>
               <span className="text-xs text-sidebar-muted truncate">Admin Panel</span>
             </div>
           )}
@@ -183,7 +183,7 @@ export function AdminSidebar({ collapsed, setCollapsed }) {
             <Smartphone className="w-5 h-5 text-sidebar-primary-foreground" />
           </div>
           <div className="flex flex-col min-w-0">
-            <span className="font-semibold text-sidebar-accent-foreground truncate">Reseller</span>
+            <span className="font-semibold text-sidebar-accent-foreground truncate">Cashmish</span>
             <span className="text-xs text-sidebar-muted truncate">Admin Panel</span>
           </div>
         </div>

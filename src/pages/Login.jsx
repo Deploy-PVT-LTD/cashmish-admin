@@ -45,7 +45,7 @@ export default function Login() {
           <div className="w-16 h-16 rounded-2xl bg-primary flex items-center justify-center mb-4 shadow-lg">
             <Smartphone className="w-8 h-8 text-primary-foreground" />
           </div>
-          <h1 className="text-2xl font-bold text-foreground">Reseller Admin</h1>
+          <h1 className="text-2xl font-bold text-foreground">Cashmish Admin</h1>
           <p className="text-muted-foreground text-sm">Sign in to your account</p>
         </div>
 
