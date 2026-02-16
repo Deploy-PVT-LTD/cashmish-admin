@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { AdminSidebar } from './AdminSidebar';
 import { TopNavbar } from './TopNavbar';
 
-export function AdminLayout({ children, title, subtitle }) {
+export function AdminLayout({ children, title, subtitle, actions }) {
   const [collapsed, setCollapsed] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
 
@@ -29,7 +29,7 @@ export function AdminLayout({ children, title, subtitle }) {
         className="transition-all duration-300"
         style={{ marginLeft: sidebarWidth }}
       >
-        <TopNavbar title={title} subtitle={subtitle} />
+        <TopNavbar title={title} subtitle={subtitle} actions={actions} />
         <main className="p-4 sm:p-6 animate-fade-in">
           {children}
         </main>

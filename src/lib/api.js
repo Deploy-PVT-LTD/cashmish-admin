@@ -1,7 +1,7 @@
 import axios from 'axios';
 
-// const API_BASE_URL = 'http://localhost:5000/api';
-const API_BASE_URL = 'https://cashmish-backend.onrender.com/api';
+const API_BASE_URL = 'http://localhost:5000/api';
+// const API_BASE_URL = 'https://cashmish-backend.onrender.com/api';
 
 const api = axios.create({
   baseURL: API_BASE_URL,
@@ -221,6 +221,33 @@ export const bankDetailsApi = {
   // Delete bank detail
   delete: async (id) => {
     const response = await api.delete(`/bankDetails/${id}`);
+    return response.data;
+  }
+};
+
+// Coupon API
+export const couponApi = {
+  // Get all coupons
+  getAll: async () => {
+    const response = await api.get('/coupons');
+    return response.data;
+  },
+
+  // Create new coupon
+  create: async (couponData) => {
+    const response = await api.post('/coupons', couponData);
+    return response.data;
+  },
+
+  // Update coupon
+  update: async (id, couponData) => {
+    const response = await api.put(`/coupons/${id}`, couponData);
+    return response.data;
+  },
+
+  // Delete coupon
+  delete: async (id) => {
+    const response = await api.delete(`/coupons/${id}`);
     return response.data;
   }
 };

@@ -10,7 +10,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
 
-export function TopNavbar({ title, subtitle }) {
+export function TopNavbar({ title, subtitle, actions }) {
   const { logout } = useAuth();
   const navigate = useNavigate();
   const handleLogout = () => {
@@ -29,6 +29,9 @@ export function TopNavbar({ title, subtitle }) {
 
         {/* Right: Actions */}
         <div className="flex items-center gap-1 sm:gap-3 flex-shrink-0">
+          {/* Page-specific Actions */}
+          {actions && <div className="hidden sm:block">{actions}</div>}
+
           {/* Notifications */}
           {/* <Button variant="ghost" size="icon" className="relative h-8 w-8 sm:h-10 sm:w-10">
             <Bell className="w-4 h-4 sm:w-5 sm:h-5" />
@@ -53,6 +56,6 @@ export function TopNavbar({ title, subtitle }) {
           </DropdownMenu>
         </div>
       </div>
-    </header>
+    </header >
   );
 }
