@@ -28,6 +28,7 @@ export default function BankDetails() {
     const [detailToDelete, setDetailToDelete] = useState(null);
     const [selectedDetail, setSelectedDetail] = useState(null);
     const [viewModalOpen, setViewModalOpen] = useState(false);
+    const [payoutConfirmItem, setPayoutConfirmItem] = useState(null);
 
     const fetchBankDetails = async () => {
         try {
@@ -135,7 +136,7 @@ export default function BankDetails() {
                                                     <Button
                                                         variant="ghost"
                                                         size="sm"
-                                                        onClick={() => handleStatusChange(item._id, 'paid')}
+                                                        onClick={() => setPayoutConfirmItem(item)}
                                                         title="Mark as Paid"
                                                         className="text-green-600 hover:text-green-700 hover:bg-green-50"
                                                     >
@@ -269,6 +270,42 @@ export default function BankDetails() {
                         <AlertDialogCancel>Cancel</AlertDialogCancel>
                         <AlertDialogAction onClick={handleDelete} className="bg-destructive hover:bg-destructive/90">
                             Delete
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
+
+            {/* Payout Confirmation */}
+            <AlertDialog open={!!payoutConfirmItem} onOpenChange={() => setPayoutConfirmItem(null)}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle className="flex items-center gap-2">
+                            <CheckCircle className="w-5 h-5 text-green-600" />
+                            Confirm Payment
+                        </AlertDialogTitle>
+                        <AlertDialogDescription>
+                            Are you sure you want to mark this request as <strong>PAID</strong>?
+                            <div className="mt-4 p-3 bg-muted rounded-lg border text-foreground">
+                                <p className="text-xs font-bold uppercase text-muted-foreground mb-1">Payment Details</p>
+                                <p><strong>Amount:</strong> ${payoutConfirmItem?.amount}</p>
+                                <p><strong>User:</strong> {payoutConfirmItem?.userId?.name}</p>
+                                <p><strong>Bank:</strong> {payoutConfirmItem?.bankName}</p>
+                            </div>
+                            <p className="mt-4 text-xs text-amber-600 font-semibold">
+                                ⚠️ An automated email will be sent to the user notifying them of the payment.
+                            </p>
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction
+                            onClick={() => {
+                                handleStatusChange(payoutConfirmItem._id, 'paid');
+                                setPayoutConfirmItem(null);
+                            }}
+                            className="bg-green-600 hover:bg-green-700"
+                        >
+                            Confirm & Send Email
                         </AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>
