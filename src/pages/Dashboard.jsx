@@ -27,6 +27,7 @@ export default function Dashboard() {
     totalUsers: 0,
     chartData: [],
     brandData: [],
+    conditionData: [],
     recentSubmissions: [],
   });
   const [loading, setLoading] = useState(true);
@@ -49,6 +50,7 @@ export default function Dashboard() {
             totalUsers: data.totalUsers || 0,
             chartData: data.chartData || [],
             brandData: data.brandData || [],
+            conditionData: data.conditionData || [],
             recentSubmissions: data.recentSubmissions || [],
           });
         }
@@ -139,7 +141,7 @@ export default function Dashboard() {
         <div className="lg:col-span-2">
           <SubmissionsChart data={stats.chartData} />
         </div>
-        <ConditionChart />
+        <ConditionChart data={stats.conditionData} />
       </div>
 
       {/* Brand Chart & Recent Submissions */}
