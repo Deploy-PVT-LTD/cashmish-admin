@@ -133,37 +133,39 @@ export default function BankDetails() {
                                         <td className="px-6 py-4 text-right">
                                             <div className="flex justify-end gap-2">
                                                 {item.status !== 'paid' && (
-                                                    <Button
-                                                        variant="ghost"
-                                                        size="sm"
-                                                        onClick={() => setPayoutConfirmItem(item)}
-                                                        title="Mark as Paid"
-                                                        className="text-green-600 hover:text-green-700 hover:bg-green-50"
-                                                    >
-                                                        <CheckCircle className="w-4 h-4" />
-                                                    </Button>
-                                                )}
-                                                {item.status !== 'pending' && (
-                                                    <Button
-                                                        variant="ghost"
-                                                        size="sm"
-                                                        onClick={() => handleStatusChange(item._id, 'pending')}
-                                                        title="Mark as Pending"
-                                                        className="text-yellow-600 hover:text-yellow-700 hover:bg-yellow-50"
-                                                    >
-                                                        <Clock className="w-4 h-4" />
-                                                    </Button>
-                                                )}
-                                                {item.status !== 'rejected' && (
-                                                    <Button
-                                                        variant="ghost"
-                                                        size="sm"
-                                                        onClick={() => handleStatusChange(item._id, 'rejected')}
-                                                        title="Mark as Rejected"
-                                                        className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                                                    >
-                                                        <XCircle className="w-4 h-4" />
-                                                    </Button>
+                                                    <>
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="sm"
+                                                            onClick={() => setPayoutConfirmItem(item)}
+                                                            title="Mark as Paid"
+                                                            className="text-green-600 hover:text-green-700 hover:bg-green-50"
+                                                        >
+                                                            <CheckCircle className="w-4 h-4" />
+                                                        </Button>
+                                                        {item.status !== 'pending' && (
+                                                            <Button
+                                                                variant="ghost"
+                                                                size="sm"
+                                                                onClick={() => handleStatusChange(item._id, 'pending')}
+                                                                title="Mark as Pending"
+                                                                className="text-yellow-600 hover:text-yellow-700 hover:bg-yellow-50"
+                                                            >
+                                                                <Clock className="w-4 h-4" />
+                                                            </Button>
+                                                        )}
+                                                        {item.status !== 'rejected' && (
+                                                            <Button
+                                                                variant="ghost"
+                                                                size="sm"
+                                                                onClick={() => handleStatusChange(item._id, 'rejected')}
+                                                                title="Mark as Rejected"
+                                                                className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                                                            >
+                                                                <XCircle className="w-4 h-4" />
+                                                            </Button>
+                                                        )}
+                                                    </>
                                                 )}
                                                 <Button
                                                     variant="ghost"
@@ -290,6 +292,7 @@ export default function BankDetails() {
                                 <p><strong>Amount:</strong> ${payoutConfirmItem?.amount}</p>
                                 <p><strong>User:</strong> {payoutConfirmItem?.userId?.name}</p>
                                 <p><strong>Bank:</strong> {payoutConfirmItem?.bankName}</p>
+                                <p><strong>Account:</strong> {payoutConfirmItem?.accountNumber}</p>
                             </div>
                             <p className="mt-4 text-xs text-amber-600 font-semibold">
                                 ⚠️ An automated email will be sent to the user notifying them of the payment.
