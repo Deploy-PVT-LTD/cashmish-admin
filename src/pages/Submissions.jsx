@@ -616,7 +616,7 @@ export default function Submissions() {
           setBidPrice('');
         }
       }}>
-        <DialogContent className="bg-card max-w-md">
+        <DialogContent className="bg-card max-w-[95vw] sm:max-w-md max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{isEditingBid ? 'Edit Bid' : 'Place Bid'}</DialogTitle>
           </DialogHeader>

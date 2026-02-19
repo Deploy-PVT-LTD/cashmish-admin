@@ -306,7 +306,7 @@ export default function Requests() {
             )}
 
             <Dialog open={rejectModalOpen} onOpenChange={setRejectModalOpen}>
-                <DialogContent>
+                <DialogContent className="bg-card max-w-[95vw] sm:max-w-md max-h-[90vh] overflow-y-auto">
                     <DialogHeader>
                         <DialogTitle>Reject Request</DialogTitle>
                     </DialogHeader>
