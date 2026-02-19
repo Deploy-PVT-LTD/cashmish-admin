@@ -302,7 +302,7 @@ export default function Submissions() {
                       Bid
                     </Button>
                   )}
-                  {submission.bidPrice > 0 && (
+                  {submission.bidPrice > 0 && ['pending', 'bid_placed'].includes(submission.status) && (
                     <Button size="sm" variant="outline" className="flex-1" onClick={() => openBidModal(submission, true)}>
                       <Pencil className="w-4 h-4 mr-2" />
                       Edit Bid
@@ -361,7 +361,7 @@ export default function Submissions() {
                               <DollarSign className="w-4 h-4" />
                             </Button>
                           )}
-                          {submission.bidPrice > 0 && submission.status !== 'accepted' && (
+                          {submission.bidPrice > 0 && ['pending', 'bid_placed'].includes(submission.status) && (
                             <Button variant="ghost" size="sm" className="text-warning hover:text-warning" onClick={() => openBidModal(submission, true)}>
                               <Pencil className="w-4 h-4" />
                             </Button>
@@ -507,7 +507,7 @@ export default function Submissions() {
                     <span className="text-foreground font-medium">Your Bid</span>
                     <div className="flex items-center gap-2">
                       <span className="text-2xl font-bold text-info">${selectedSubmission.bidPrice?.toLocaleString()}</span>
-                      {selectedSubmission.status !== 'accepted' && (
+                      {['pending', 'bid_placed'].includes(selectedSubmission.status) && (
                         <Button
                           variant="ghost"
                           size="sm"
@@ -552,7 +552,7 @@ export default function Submissions() {
               )}
 
               {/* Edit Bid Button for already bid items */}
-              {selectedSubmission.bidPrice > 0 && selectedSubmission.status !== 'accepted' && (
+              {selectedSubmission.bidPrice > 0 && ['pending', 'bid_placed'].includes(selectedSubmission.status) && (
                 <Button
                   variant="outline"
                   className="w-full"

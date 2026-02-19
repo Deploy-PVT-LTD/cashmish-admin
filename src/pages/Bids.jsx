@@ -217,25 +217,29 @@ export default function Bids() {
                   </Button>
                 ) : (
                   <div className="flex gap-2">
-                    <Button
-                      variant="outline"
-                      className="flex-1 text-sm"
-                      onClick={() => openBidModal(bid, true)}
-                    >
-                      <Pencil className="w-4 h-4 mr-2" />
-                      Edit
-                    </Button>
-                    <Button
-                      variant="outline"
-                      className="text-sm border-destructive text-destructive hover:bg-destructive hover:text-destructive-foreground"
-                      onClick={() => {
-                        setSelectedBid(bid);
-                        setIsEditing(true);
-                        handleCancelBid();
-                      }}
-                    >
-                      <X className="w-4 h-4" />
-                    </Button>
+                    {['pending', 'bid_placed'].includes(bid.status) && (
+                      <Button
+                        variant="outline"
+                        className="flex-1 text-sm"
+                        onClick={() => openBidModal(bid, true)}
+                      >
+                        <Pencil className="w-4 h-4 mr-2" />
+                        Edit
+                      </Button>
+                    )}
+                    {['pending', 'bid_placed'].includes(bid.status) && (
+                      <Button
+                        variant="outline"
+                        className="text-sm border-destructive text-destructive hover:bg-destructive hover:text-destructive-foreground"
+                        onClick={() => {
+                          setSelectedBid(bid);
+                          setIsEditing(true);
+                          handleCancelBid();
+                        }}
+                      >
+                        <X className="w-4 h-4" />
+                      </Button>
+                    )}
                   </div>
                 )}
               </div>
