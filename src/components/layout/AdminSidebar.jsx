@@ -17,6 +17,7 @@ import {
   ChevronRight,
   RefreshCw,
   Menu,
+  MessageSquare,
   X,
   Ticket, // Added Ticket icon
 } from 'lucide-react';
@@ -34,6 +35,7 @@ const navItems = [
   { icon: Package, label: 'Inventory', path: '/inventory', allowedRoles: ['superadmin', 'admin', 'accountant'] },
   { icon: Landmark, label: 'Bank Details', path: '/bank-details', allowedRoles: ['superadmin', 'admin', 'accountant'] },
   // { icon: Ticket, label: 'Coupons', path: '/coupons', allowedRoles: ['superadmin', 'admin'] },
+  { icon: MessageSquare, label: 'Reviews', path: '/reviews', allowedRoles: ['superadmin', 'admin'] },
   { icon: Users, label: 'Users', path: '/users', allowedRoles: ['superadmin'] },
   // { icon: BarChart3, label: 'Analytics', path: '/analytics' },
   { icon: Settings, label: 'Settings', path: '/settings', allowedRoles: ['superadmin', 'admin', 'accountant'] },

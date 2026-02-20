@@ -18,6 +18,7 @@ import Settings from "./pages/Settings";
 import PriceConfiguration from "./pages/PriceConfiguration";
 import BankDetails from "./pages/BankDetails";
 import Coupons from './pages/Coupons';
+import Reviews from './pages/Reviews';
 import Login from "./pages/Login";
 import NotFound from "./pages/NotFound";
 
@@ -46,7 +47,7 @@ const App = () => (
             <Route path="/bank-details" element={<ProtectedRoute allowedRoles={['superadmin', 'admin', 'accountant']}><BankDetails /></ProtectedRoute>} />
             <Route path="/coupons" element={<ProtectedRoute allowedRoles={['superadmin', 'admin']}><Coupons /></ProtectedRoute>} />
             <Route path="/settings" element={<ProtectedRoute allowedRoles={['superadmin', 'admin', 'accountant']}><Settings /></ProtectedRoute>} />
-
+            <Route path="/reviews" element={<ProtectedRoute allowedRoles={['superadmin', 'admin']}><Reviews /></ProtectedRoute>} />
             {/* Super Admin Only */}
             <Route path="/users" element={<ProtectedRoute allowedRoles={['superadmin']}><Users /></ProtectedRoute>} />
             <Route path="/requests" element={<ProtectedRoute allowedRoles={['superadmin']}><Requests /></ProtectedRoute>} />
