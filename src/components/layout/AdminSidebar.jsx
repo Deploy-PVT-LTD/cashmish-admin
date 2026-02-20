@@ -121,7 +121,7 @@ export function AdminSidebar({ collapsed, setCollapsed }) {
         </div>
 
         {/* Navigation */}
-        <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
+        <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
           {filteredNavItems.map((item) => {
             const isActive = location.pathname === item.path;
             return (
@@ -196,7 +196,7 @@ export function AdminSidebar({ collapsed, setCollapsed }) {
         </div>
 
         {/* Navigation */}
-        <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
+        <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
           {filteredNavItems.map((item) => {
             const isActive = location.pathname === item.path;
             return (

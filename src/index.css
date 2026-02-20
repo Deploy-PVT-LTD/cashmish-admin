@@ -183,3 +183,8 @@
     text-wrap: balance;
   }
 }
+
+/* Hide scrollbar for sidebar nav */
+nav[style*="scrollbar-width"]::-webkit-scrollbar {
+  display: none;
+}
