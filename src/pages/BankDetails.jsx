@@ -48,13 +48,18 @@ export default function BankDetails() {
     }, []);
 
     const handleStatusChange = async (id, newStatus) => {
+        // Optimistic UI update — reflect change immediately
+        setDetails(prev => prev.map(item =>
+            item._id === id ? { ...item, status: newStatus } : item
+        ));
         try {
             await bankDetailsApi.update(id, { status: newStatus });
             toast.success(`Status updated to ${newStatus}`);
-            fetchBankDetails();
         } catch (error) {
             console.error('Error updating status:', error);
             toast.error('Failed to update status');
+            // Revert on failure
+            fetchBankDetails();
         }
     };
 
