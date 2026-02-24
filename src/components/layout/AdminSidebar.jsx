@@ -33,7 +33,7 @@ const navItems = [
   { icon: FileText, label: 'Submissions', path: '/submissions', allowedRoles: ['superadmin', 'admin'] },
   // { icon: Gavel, label: 'Bids', path: '/bids', allowedRoles: ['superadmin', 'admin'] },
   { icon: Package, label: 'Inventory', path: '/inventory', allowedRoles: ['superadmin', 'admin', 'accountant'] },
-  { icon: Landmark, label: 'Bank Details', path: '/bank-details', allowedRoles: ['superadmin', 'admin', 'accountant'] },
+  { icon: Landmark, label: 'Payment Details', path: '/bank-details', allowedRoles: ['superadmin', 'admin', 'accountant'] },
   // { icon: Ticket, label: 'Coupons', path: '/coupons', allowedRoles: ['superadmin', 'admin'] },
   { icon: MessageSquare, label: 'Reviews', path: '/reviews', allowedRoles: ['superadmin', 'admin'] },
   { icon: FileText, label: 'Blogs', path: '/blogs', allowedRoles: ['superadmin', 'admin'] },

@@ -20,7 +20,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { Landmark, User, CreditCard, Eye, Loader2, Trash2, CheckCircle, Clock, XCircle } from 'lucide-react';
+import { Landmark, User, CreditCard, Eye, Loader2, Trash2, CheckCircle, Clock, XCircle, Zap } from 'lucide-react';
 
 export default function BankDetails() {
     const [details, setDetails] = useState([]);
@@ -28,6 +28,7 @@ export default function BankDetails() {
     const [detailToDelete, setDetailToDelete] = useState(null);
     const [selectedDetail, setSelectedDetail] = useState(null);
     const [viewModalOpen, setViewModalOpen] = useState(false);
+    const [methodFilter, setMethodFilter] = useState('all'); // 'all' | 'bank' | 'zelle'
     const [payoutConfirmItem, setPayoutConfirmItem] = useState(null);
 
     const fetchBankDetails = async () => {
@@ -89,15 +90,45 @@ export default function BankDetails() {
         );
     };
 
+    const filteredDetails = details.filter(item => {
+        if (methodFilter === 'all') return true;
+        return (item.payoutMethod || 'bank') === methodFilter;
+    });
+
+    const getMethodBadge = (method) => {
+        if (method === 'zelle') {
+            return <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold bg-purple-100 text-purple-700 border border-purple-200"><Zap className="w-3 h-3" /> Zelle</span>;
+        }
+        return <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold bg-blue-100 text-blue-700 border border-blue-200"><Landmark className="w-3 h-3" /> Bank</span>;
+    };
+
     return (
-        <AdminLayout title="Bank Details" subtitle="View and manage user bank details for payments">
+        <AdminLayout title="Payout Details" subtitle="View and manage user payout requests (Bank & Zelle)">
+            {/* Filter Tabs */}
+            <div className="flex gap-2 mb-6">
+                {[{ key: 'all', label: 'All' }, { key: 'bank', label: 'Bank' }, { key: 'zelle', label: 'Zelle' }].map(tab => (
+                    <Button
+                        key={tab.key}
+                        variant={methodFilter === tab.key ? 'default' : 'outline'}
+                        size="sm"
+                        onClick={() => setMethodFilter(tab.key)}
+                        className={cn('font-bold', methodFilter === tab.key && tab.key === 'zelle' && 'bg-purple-600 hover:bg-purple-700')}
+                    >
+                        {tab.key === 'bank' && <Landmark className="w-4 h-4 mr-1" />}
+                        {tab.key === 'zelle' && <Zap className="w-4 h-4 mr-1" />}
+                        {tab.label}
+                        <span className="ml-1.5 text-xs opacity-70">({details.filter(d => tab.key === 'all' ? true : (d.payoutMethod || 'bank') === tab.key).length})</span>
+                    </Button>
+                ))}
+            </div>
+
             {loading ? (
                 <div className="flex items-center justify-center h-64">
                     <Loader2 className="w-8 h-8 animate-spin text-primary" />
                 </div>
-            ) : details.length === 0 ? (
+            ) : filteredDetails.length === 0 ? (
                 <div className="text-center py-20 bg-muted/10 rounded-lg border border-dashed text-muted-foreground">
-                    No bank details requests found.
+                    No {methodFilter === 'all' ? '' : methodFilter} payout requests found.
                 </div>
             ) : (
                 <div className="data-table">
@@ -106,14 +137,15 @@ export default function BankDetails() {
                             <thead className="bg-muted/50">
                                 <tr>
                                     <th className="text-left text-xs font-medium text-muted-foreground uppercase tracking-wider px-6 py-4">User</th>
-                                    <th className="text-left text-xs font-medium text-muted-foreground uppercase tracking-wider px-6 py-4">Bank Info</th>
-                                    <th className="text-left text-xs font-medium text-muted-foreground uppercase tracking-wider px-6 py-4">Account Details</th>
+                                    <th className="text-left text-xs font-medium text-muted-foreground uppercase tracking-wider px-6 py-4">Method</th>
+                                    <th className="text-left text-xs font-medium text-muted-foreground uppercase tracking-wider px-6 py-4">Payout Info</th>
+                                    <th className="text-left text-xs font-medium text-muted-foreground uppercase tracking-wider px-6 py-4">Amount</th>
                                     <th className="text-left text-xs font-medium text-muted-foreground uppercase tracking-wider px-6 py-4">Status</th>
                                     <th className="text-right text-xs font-medium text-muted-foreground uppercase tracking-wider px-6 py-4">Actions</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                {details.map((item) => (
+                                {filteredDetails.map((item) => (
                                     <tr key={item._id} className="border-t border-border hover:bg-muted/30 transition-colors">
                                         <td className="px-6 py-4">
                                             <div className="flex flex-col">
@@ -122,15 +154,25 @@ export default function BankDetails() {
                                             </div>
                                         </td>
                                         <td className="px-6 py-4">
-                                            <div className="flex flex-col">
-                                                <span className="text-sm font-medium">{item.bankName}</span>
-                                            </div>
+                                            {getMethodBadge(item.payoutMethod || 'bank')}
                                         </td>
                                         <td className="px-6 py-4">
-                                            <div className="flex flex-col">
-                                                <span className="text-sm font-medium">{item.accountNumber}</span>
-                                                <span className="text-xs text-muted-foreground">{item.accountHolderName}</span>
-                                            </div>
+                                            {(item.payoutMethod || 'bank') === 'bank' ? (
+                                                <div className="flex flex-col">
+                                                    <span className="text-sm font-medium">{item.bankName}</span>
+                                                    <span className="text-xs text-muted-foreground">Acct: {item.accountNumber}</span>
+                                                    <span className="text-xs text-muted-foreground">{item.accountHolderName}</span>
+                                                </div>
+                                            ) : (
+                                                <div className="flex flex-col">
+                                                    <span className="text-sm font-medium">{item.zelleContact}</span>
+                                                    <span className="text-xs text-muted-foreground capitalize">{item.zelleContactType || 'email'}</span>
+                                                    <span className="text-xs text-muted-foreground">{item.accountHolderName}</span>
+                                                </div>
+                                            )}
+                                        </td>
+                                        <td className="px-6 py-4">
+                                            <span className="text-sm font-bold">${item.amount?.toFixed(2)}</span>
                                         </td>
                                         <td className="px-6 py-4">
                                             {getStatusBadge(item.status)}
@@ -208,7 +250,7 @@ export default function BankDetails() {
                     <DialogHeader>
                         <DialogTitle className="flex items-center gap-2 text-xl font-bold">
                             <CreditCard className="w-6 h-6 text-primary" />
-                            Bank Request Details
+                            Payout Request Details
                         </DialogTitle>
                     </DialogHeader>
                     {selectedDetail && (
@@ -228,30 +270,55 @@ export default function BankDetails() {
                                         <span className="font-medium">{selectedDetail.userId?.email || 'N/A'}</span>
                                     </div>
                                     <div>
+                                        <span className="text-xs text-muted-foreground block font-semibold">Amount</span>
+                                        <span className="font-bold text-lg">${selectedDetail.amount?.toFixed(2)}</span>
+                                    </div>
+                                    <div>
+                                        <span className="text-xs text-muted-foreground block font-semibold">Method</span>
+                                        <div className="mt-1">{getMethodBadge(selectedDetail.payoutMethod || 'bank')}</div>
+                                    </div>
+                                    <div>
                                         <span className="text-xs text-muted-foreground block font-semibold">Status</span>
                                         <div className="mt-1">{getStatusBadge(selectedDetail.status)}</div>
                                     </div>
                                 </div>
                             </div>
 
-                            {/* Bank Section */}
+                            {/* Payout Info Section */}
                             <div className="space-y-4">
                                 <h4 className="text-sm font-semibold text-muted-foreground uppercase flex items-center gap-2">
-                                    <Landmark className="w-4 h-4" /> Bank Information
+                                    {(selectedDetail.payoutMethod || 'bank') === 'bank'
+                                        ? <><Landmark className="w-4 h-4" /> Bank Information</>
+                                        : <><Zap className="w-4 h-4" /> Zelle Information</>}
                                 </h4>
                                 <div className="space-y-3 bg-muted/30 p-4 rounded-lg border">
-                                    <div>
-                                        <span className="text-xs text-muted-foreground block font-semibold">Bank Name</span>
-                                        <span className="font-medium">{selectedDetail.bankName}</span>
-                                    </div>
                                     <div>
                                         <span className="text-xs text-muted-foreground block font-semibold">Account Holder</span>
                                         <span className="font-medium">{selectedDetail.accountHolderName}</span>
                                     </div>
-                                    <div>
-                                        <span className="text-xs text-muted-foreground block font-semibold">Account Number</span>
-                                        <span className="font-mono font-bold text-primary tracking-wider break-all">{selectedDetail.accountNumber}</span>
-                                    </div>
+                                    {(selectedDetail.payoutMethod || 'bank') === 'bank' ? (
+                                        <>
+                                            <div>
+                                                <span className="text-xs text-muted-foreground block font-semibold">Bank Name</span>
+                                                <span className="font-medium">{selectedDetail.bankName}</span>
+                                            </div>
+                                            <div>
+                                                <span className="text-xs text-muted-foreground block font-semibold">Account Number</span>
+                                                <span className="font-mono font-bold text-primary tracking-wider break-all">{selectedDetail.accountNumber}</span>
+                                            </div>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <div>
+                                                <span className="text-xs text-muted-foreground block font-semibold">Zelle Contact Type</span>
+                                                <span className="font-medium capitalize">{selectedDetail.zelleContactType || 'email'}</span>
+                                            </div>
+                                            <div>
+                                                <span className="text-xs text-muted-foreground block font-semibold">Zelle Contact</span>
+                                                <span className="font-mono font-bold text-purple-600 tracking-wider break-all">{selectedDetail.zelleContact}</span>
+                                            </div>
+                                        </>
+                                    )}
                                     <div>
                                         <span className="text-xs text-muted-foreground block font-semibold">Submitted On</span>
                                         <span className="text-sm">{new Date(selectedDetail.createdAt).toLocaleString()}</span>
@@ -296,8 +363,15 @@ export default function BankDetails() {
                                 <p className="text-xs font-bold uppercase text-muted-foreground mb-1">Payment Details</p>
                                 <p><strong>Amount:</strong> ${payoutConfirmItem?.amount}</p>
                                 <p><strong>User:</strong> {payoutConfirmItem?.userId?.name}</p>
-                                <p><strong>Bank:</strong> {payoutConfirmItem?.bankName}</p>
-                                <p><strong>Account:</strong> {payoutConfirmItem?.accountNumber}</p>
+                                <p><strong>Method:</strong> {(payoutConfirmItem?.payoutMethod || 'bank') === 'bank' ? 'Bank Account' : 'Zelle'}</p>
+                                {(payoutConfirmItem?.payoutMethod || 'bank') === 'bank' ? (
+                                    <>
+                                        <p><strong>Bank:</strong> {payoutConfirmItem?.bankName}</p>
+                                        <p><strong>Account:</strong> {payoutConfirmItem?.accountNumber}</p>
+                                    </>
+                                ) : (
+                                    <p><strong>Zelle ({payoutConfirmItem?.zelleContactType}):</strong> {payoutConfirmItem?.zelleContact}</p>
+                                )}
                             </div>
                             <p className="mt-4 text-xs text-amber-600 font-semibold">
                                 ⚠️ An automated email will be sent to the user notifying them of the payment.
