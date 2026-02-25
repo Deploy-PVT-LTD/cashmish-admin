@@ -264,6 +264,9 @@ export default function Submissions() {
               <div key={submission._id} className="stat-card">
                 <div className="flex items-start justify-between mb-3">
                   <div className="min-w-0 flex-1 mr-2">
+                    <p className="text-xs font-bold text-primary mb-0.5">
+                      {submission.submissionId ? `CM#${submission.submissionId}` : `#${submission._id.slice(-4).toUpperCase()}`}
+                    </p>
                     <p className="font-medium text-foreground truncate">{submission.pickUpDetails?.fullName}</p>
                     <p className="text-xs text-muted-foreground truncate">{submission.pickUpDetails?.phoneNumber}</p>
                   </div>
@@ -319,6 +322,7 @@ export default function Submissions() {
               <table className="w-full">
                 <thead className="bg-muted/50">
                   <tr>
+                    <th className="text-left text-xs font-medium text-muted-foreground uppercase tracking-wider px-6 py-4">ID</th>
                     <th className="text-left text-xs font-medium text-muted-foreground uppercase tracking-wider px-6 py-4">Customer</th>
                     <th className="text-left text-xs font-medium text-muted-foreground uppercase tracking-wider px-6 py-4">Phone</th>
                     <th className="text-left text-xs font-medium text-muted-foreground uppercase tracking-wider px-6 py-4">Storage</th>
@@ -332,6 +336,11 @@ export default function Submissions() {
                 <tbody>
                   {filteredSubmissions.map((submission) => (
                     <tr key={submission._id} className="border-t border-border hover:bg-muted/30 transition-colors">
+                      <td className="px-6 py-4">
+                        <span className="inline-flex items-center px-2 py-1 rounded-md bg-primary/10 text-primary text-xs font-bold">
+                          {submission.submissionId ? `CM#${submission.submissionId}` : `#${submission._id.slice(-4).toUpperCase()}`}
+                        </span>
+                      </td>
                       <td className="px-6 py-4">
                         <div className="min-w-0">
                           <p className="text-sm font-medium text-foreground truncate max-w-[150px]">{submission.pickUpDetails?.fullName}</p>
@@ -397,6 +406,12 @@ export default function Submissions() {
             <div className="space-y-6 mt-4">
               {/* Customer & Pickup Info */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="min-w-0">
+                  <p className="text-sm text-muted-foreground">Submission ID</p>
+                  <p className="text-foreground font-bold text-primary">
+                    {selectedSubmission.submissionId ? `CM#${selectedSubmission.submissionId}` : `#${selectedSubmission._id.slice(-4).toUpperCase()}`}
+                  </p>
+                </div>
                 <div className="min-w-0">
                   <p className="text-sm text-muted-foreground">Customer</p>
                   <p className="text-foreground font-medium truncate">{selectedSubmission.pickUpDetails?.fullName}</p>

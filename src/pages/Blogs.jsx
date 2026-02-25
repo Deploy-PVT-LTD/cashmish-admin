@@ -1,9 +1,204 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { AdminLayout } from '../components/layout/AdminLayout';
-import { Plus, Pencil, Trash2, Search, Eye, EyeOff, X } from 'lucide-react';
+import { Plus, Pencil, Trash2, Search, Eye, EyeOff, X, Bold, Italic, Underline, Strikethrough, AlignLeft, AlignCenter, AlignRight, AlignJustify, List, ListOrdered, Link, Image as ImageIcon, Heading1, Heading2, Heading3, Type, Palette, ChevronDown } from 'lucide-react';
 import Swal from 'sweetalert2';
 import api from '../lib/api';
 
+// ── Rich Text Editor ────────────────────────────────────────────────
+const FONT_SIZES = ['10', '12', '14', '16', '18', '20', '24', '28', '32', '36', '48', '64'];
+const COLORS = ['#000000', '#374151', '#6b7280', '#ef4444', '#f97316', '#eab308', '#22c55e', '#3b82f6', '#8b5cf6', '#ec4899', '#ffffff'];
+
+function RichEditor({ value, onChange }) {
+    const editorRef = useRef(null);
+    const [showColorPicker, setShowColorPicker] = useState(false);
+    const [showFontSize, setShowFontSize] = useState(false);
+    const [activeFormats, setActiveFormats] = useState({});
+
+    // sync initial value
+    useEffect(() => {
+        if (editorRef.current && editorRef.current.innerHTML !== value) {
+            editorRef.current.innerHTML = value || '';
+        }
+    }, []); // eslint-disable-line
+
+    const exec = useCallback((command, val = null) => {
+        editorRef.current?.focus();
+        document.execCommand(command, false, val);
+        // sync back content
+        onChange(editorRef.current?.innerHTML || '');
+        updateActiveFormats();
+    }, [onChange]);
+
+    const updateActiveFormats = () => {
+        setActiveFormats({
+            bold: document.queryCommandState('bold'),
+            italic: document.queryCommandState('italic'),
+            underline: document.queryCommandState('underline'),
+            strikeThrough: document.queryCommandState('strikeThrough'),
+            justifyLeft: document.queryCommandState('justifyLeft'),
+            justifyCenter: document.queryCommandState('justifyCenter'),
+            justifyRight: document.queryCommandState('justifyRight'),
+            justifyFull: document.queryCommandState('justifyFull'),
+            insertUnorderedList: document.queryCommandState('insertUnorderedList'),
+            insertOrderedList: document.queryCommandState('insertOrderedList'),
+        });
+    };
+
+    const handleInput = () => {
+        onChange(editorRef.current?.innerHTML || '');
+        updateActiveFormats();
+    };
+
+    const insertLink = () => {
+        const url = prompt('Enter URL:', 'https://');
+        if (url) exec('createLink', url);
+    };
+
+    const setFontSize = (size) => {
+        // execCommand fontSize only accepts 1-7; use a workaround with span
+        editorRef.current?.focus();
+        document.execCommand('fontSize', false, '7');
+        const fontElements = editorRef.current?.querySelectorAll('font[size="7"]');
+        fontElements?.forEach(el => {
+            el.removeAttribute('size');
+            el.style.fontSize = size + 'px';
+        });
+        onChange(editorRef.current?.innerHTML || '');
+        setShowFontSize(false);
+    };
+
+    const setColor = (color) => {
+        exec('foreColor', color);
+        setShowColorPicker(false);
+    };
+
+    const btnCls = (active) =>
+        `p-1.5 rounded transition-all cursor-pointer text-sm ${active ? 'bg-blue-600 text-white' : 'text-gray-600 hover:bg-gray-100'}`;
+
+    const divider = <div className="w-px h-6 bg-gray-200 mx-0.5 self-center" />;
+
+    return (
+        <div className="border border-gray-200 rounded-xl overflow-hidden shadow-sm">
+            {/* Toolbar */}
+            <div className="bg-gray-50 border-b border-gray-200 p-2 flex flex-wrap items-center gap-0.5">
+
+                {/* Headings */}
+                <button type="button" title="Heading 1" className={btnCls(false)} onClick={() => exec('formatBlock', 'h1')}><Heading1 size={15} /></button>
+                <button type="button" title="Heading 2" className={btnCls(false)} onClick={() => exec('formatBlock', 'h2')}><Heading2 size={15} /></button>
+                <button type="button" title="Heading 3" className={btnCls(false)} onClick={() => exec('formatBlock', 'h3')}><Heading3 size={15} /></button>
+                <button type="button" title="Paragraph" className={btnCls(false)} onClick={() => exec('formatBlock', 'p')}><Type size={15} /></button>
+                {divider}
+
+                {/* Text Style */}
+                <button type="button" title="Bold" className={btnCls(activeFormats.bold)} onClick={() => exec('bold')}><Bold size={15} /></button>
+                <button type="button" title="Italic" className={btnCls(activeFormats.italic)} onClick={() => exec('italic')}><Italic size={15} /></button>
+                <button type="button" title="Underline" className={btnCls(activeFormats.underline)} onClick={() => exec('underline')}><Underline size={15} /></button>
+                <button type="button" title="Strikethrough" className={btnCls(activeFormats.strikeThrough)} onClick={() => exec('strikeThrough')}><Strikethrough size={15} /></button>
+                {divider}
+
+                {/* Font Size */}
+                <div className="relative">
+                    <button
+                        type="button"
+                        title="Font Size"
+                        className="flex items-center gap-1 px-2 py-1.5 rounded text-xs font-medium text-gray-600 hover:bg-gray-100 transition-all cursor-pointer"
+                        onClick={() => { setShowFontSize(!showFontSize); setShowColorPicker(false); }}
+                    >
+                        Size <ChevronDown size={12} />
+                    </button>
+                    {showFontSize && (
+                        <div className="absolute top-full left-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-xl z-50 p-1 grid grid-cols-3 gap-0.5 w-32">
+                            {FONT_SIZES.map(s => (
+                                <button key={s} type="button" className="px-2 py-1 text-xs hover:bg-blue-50 hover:text-blue-600 rounded cursor-pointer transition-colors"
+                                    onClick={() => setFontSize(s)}>{s}px</button>
+                            ))}
+                        </div>
+                    )}
+                </div>
+                {divider}
+
+                {/* Alignment */}
+                <button type="button" title="Align Left" className={btnCls(activeFormats.justifyLeft)} onClick={() => exec('justifyLeft')}><AlignLeft size={15} /></button>
+                <button type="button" title="Align Center" className={btnCls(activeFormats.justifyCenter)} onClick={() => exec('justifyCenter')}><AlignCenter size={15} /></button>
+                <button type="button" title="Align Right" className={btnCls(activeFormats.justifyRight)} onClick={() => exec('justifyRight')}><AlignRight size={15} /></button>
+                <button type="button" title="Justify" className={btnCls(activeFormats.justifyFull)} onClick={() => exec('justifyFull')}><AlignJustify size={15} /></button>
+                {divider}
+
+                {/* Lists */}
+                <button type="button" title="Bullet List" className={btnCls(activeFormats.insertUnorderedList)} onClick={() => exec('insertUnorderedList')}><List size={15} /></button>
+                <button type="button" title="Numbered List" className={btnCls(activeFormats.insertOrderedList)} onClick={() => exec('insertOrderedList')}><ListOrdered size={15} /></button>
+                {divider}
+
+                {/* Color */}
+                <div className="relative">
+                    <button
+                        type="button"
+                        title="Text Color"
+                        className="flex items-center gap-1 px-2 py-1.5 rounded text-xs font-medium text-gray-600 hover:bg-gray-100 transition-all cursor-pointer"
+                        onClick={() => { setShowColorPicker(!showColorPicker); setShowFontSize(false); }}
+                    >
+                        <Palette size={15} /> <ChevronDown size={12} />
+                    </button>
+                    {showColorPicker && (
+                        <div className="absolute top-full left-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-xl z-50 p-2 flex flex-wrap gap-1.5 w-36">
+                            {COLORS.map(c => (
+                                <button key={c} type="button" title={c}
+                                    className="w-6 h-6 rounded-full border-2 border-gray-200 hover:scale-110 transition-transform cursor-pointer shadow-sm"
+                                    style={{ backgroundColor: c }}
+                                    onClick={() => setColor(c)}
+                                />
+                            ))}
+                        </div>
+                    )}
+                </div>
+                {divider}
+
+                {/* Extras */}
+                <button type="button" title="Insert Link" className={btnCls(false)} onClick={insertLink}><Link size={15} /></button>
+                {divider}
+
+                {/* Clear */}
+                <button
+                    type="button"
+                    title="Remove Formatting"
+                    className="px-2 py-1.5 rounded text-xs font-medium text-gray-500 hover:bg-red-50 hover:text-red-500 transition-all cursor-pointer"
+                    onClick={() => exec('removeFormat')}
+                >
+                    Clear
+                </button>
+            </div>
+
+            {/* Editable Area */}
+            <div
+                ref={editorRef}
+                contentEditable
+                suppressContentEditableWarning
+                onInput={handleInput}
+                onKeyUp={updateActiveFormats}
+                onMouseUp={updateActiveFormats}
+                onClick={() => { setShowColorPicker(false); setShowFontSize(false); }}
+                className="min-h-[220px] max-h-[400px] overflow-y-auto p-4 text-sm text-gray-800 outline-none focus:bg-blue-50/20 transition-colors
+                    [&_h1]:text-3xl [&_h1]:font-black [&_h1]:mb-3 [&_h1]:text-gray-900
+                    [&_h2]:text-2xl [&_h2]:font-bold [&_h2]:mb-2 [&_h2]:text-gray-800
+                    [&_h3]:text-xl [&_h3]:font-semibold [&_h3]:mb-2 [&_h3]:text-gray-700
+                    [&_p]:mb-2 [&_p]:leading-relaxed
+                    [&_ul]:list-disc [&_ul]:pl-6 [&_ul]:mb-2
+                    [&_ol]:list-decimal [&_ol]:pl-6 [&_ol]:mb-2
+                    [&_li]:mb-1
+                    [&_a]:text-blue-600 [&_a]:underline
+                    [&_strong]:font-bold [&_em]:italic"
+                style={{ lineHeight: '1.7' }}
+            />
+
+            {/* Footer hint */}
+            <div className="bg-gray-50 border-t border-gray-100 px-3 py-1.5 text-[10px] text-gray-400 flex items-center gap-2">
+                <span>Ctrl+B Bold</span> · <span>Ctrl+I Italic</span> · <span>Ctrl+U Underline</span> · <span>Ctrl+Z Undo</span>
+            </div>
+        </div>
+    );
+}
+
+// ── Main Blogs Page ────────────────────────────────────────────────
 const Blogs = () => {
     const [blogs, setBlogs] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -31,19 +226,14 @@ const Blogs = () => {
         }
     };
 
-    useEffect(() => {
-        fetchBlogs();
-    }, []);
+    useEffect(() => { fetchBlogs(); }, []);
 
     const resetForm = () => {
         setFormData({ title: '', excerpt: '', content: '', author: '', image: '', status: 'draft' });
         setEditingBlog(null);
     };
 
-    const openCreateModal = () => {
-        resetForm();
-        setIsModalOpen(true);
-    };
+    const openCreateModal = () => { resetForm(); setIsModalOpen(true); };
 
     const openEditModal = (blog) => {
         setEditingBlog(blog);
@@ -98,7 +288,6 @@ const Blogs = () => {
             cancelButtonColor: '#3b82f6',
             confirmButtonText: 'Yes, delete it!'
         });
-
         if (result.isConfirmed) {
             try {
                 await api.delete(`/blogs/${id}`);
@@ -181,8 +370,7 @@ const Blogs = () => {
                                         <div className="flex-1 min-w-0">
                                             <div className="flex items-center gap-2 mb-1">
                                                 <h3 className="font-bold text-gray-900 truncate">{blog.title}</h3>
-                                                <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide flex-shrink-0 ${blog.status === 'published' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'
-                                                    }`}>
+                                                <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide flex-shrink-0 ${blog.status === 'published' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>
                                                     {blog.status}
                                                 </span>
                                             </div>
@@ -192,7 +380,6 @@ const Blogs = () => {
                                             </p>
                                         </div>
                                     </div>
-
                                     <div className="flex items-center gap-2 self-start md:self-center flex-shrink-0">
                                         <button
                                             onClick={() => handleToggleStatus(blog)}
@@ -228,98 +415,113 @@ const Blogs = () => {
 
             {/* Create/Edit Modal */}
             {isModalOpen && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+                <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/60 backdrop-blur-sm p-4 overflow-y-auto">
+                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl my-6">
+                        {/* Modal Header */}
                         <div className="flex items-center justify-between p-6 border-b border-gray-100">
-                            <h2 className="text-xl font-bold text-gray-900">
-                                {editingBlog ? 'Edit Blog Post' : 'Create New Blog Post'}
-                            </h2>
+                            <div>
+                                <h2 className="text-xl font-bold text-gray-900">
+                                    {editingBlog ? 'Edit Blog Post' : 'Create New Blog Post'}
+                                </h2>
+                                <p className="text-xs text-gray-400 mt-0.5">Use the toolbar to format your content</p>
+                            </div>
                             <button onClick={() => { setIsModalOpen(false); resetForm(); }} className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
                                 <X size={18} />
                             </button>
                         </div>
 
-                        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+                        <form onSubmit={handleSubmit} className="p-6 space-y-5">
+                            {/* Title */}
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Title *</label>
+                                <label className="block text-sm font-semibold text-gray-700 mb-1.5">Title *</label>
                                 <input
                                     type="text"
                                     required
                                     value={formData.title}
                                     onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                                    className="w-full px-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                                    className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
                                     placeholder="Blog post title"
                                 />
                             </div>
+
+                            {/* Excerpt */}
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Excerpt *</label>
+                                <label className="block text-sm font-semibold text-gray-700 mb-1.5">Excerpt *</label>
                                 <input
                                     type="text"
                                     required
                                     value={formData.excerpt}
                                     onChange={(e) => setFormData({ ...formData, excerpt: e.target.value })}
-                                    className="w-full px-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                                    className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
                                     placeholder="Short description shown on blog listing"
                                 />
                             </div>
+
+                            {/* Rich Content Editor */}
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Content</label>
-                                <textarea
-                                    rows={6}
+                                <label className="block text-sm font-semibold text-gray-700 mb-1.5">Content</label>
+                                <RichEditor
+                                    key={editingBlog?._id || 'new'}
                                     value={formData.content}
-                                    onChange={(e) => setFormData({ ...formData, content: e.target.value })}
-                                    className="w-full px-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 resize-none"
-                                    placeholder="Full blog content..."
+                                    onChange={(html) => setFormData(prev => ({ ...prev, content: html }))}
                                 />
                             </div>
+
+                            {/* Author + Status */}
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">Author *</label>
+                                    <label className="block text-sm font-semibold text-gray-700 mb-1.5">Author *</label>
                                     <input
                                         type="text"
                                         required
                                         value={formData.author}
                                         onChange={(e) => setFormData({ ...formData, author: e.target.value })}
-                                        className="w-full px-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                                        className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
                                         placeholder="Author name"
                                     />
                                 </div>
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
+                                    <label className="block text-sm font-semibold text-gray-700 mb-1.5">Status</label>
                                     <select
                                         value={formData.status}
                                         onChange={(e) => setFormData({ ...formData, status: e.target.value })}
-                                        className="w-full px-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                                        className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
                                     >
                                         <option value="draft">Draft</option>
                                         <option value="published">Published</option>
                                     </select>
                                 </div>
                             </div>
+
+                            {/* Image URL */}
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Image URL</label>
+                                <label className="block text-sm font-semibold text-gray-700 mb-1.5">Image URL</label>
                                 <input
                                     type="text"
                                     value={formData.image}
                                     onChange={(e) => setFormData({ ...formData, image: e.target.value })}
-                                    className="w-full px-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                                    className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
                                     placeholder="https://example.com/image.jpg"
                                 />
+                                {formData.image && (
+                                    <img src={formData.image} alt="preview" className="mt-2 h-20 rounded-lg object-cover border border-gray-100" onError={(e) => e.target.style.display = 'none'} />
+                                )}
                             </div>
 
-                            <div className="flex gap-3 pt-4">
+                            {/* Actions */}
+                            <div className="flex gap-3 pt-2">
                                 <button
                                     type="button"
                                     onClick={() => { setIsModalOpen(false); resetForm(); }}
-                                    className="flex-1 px-4 py-2.5 border border-gray-200 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-50 transition-colors"
+                                    className="flex-1 px-4 py-2.5 border border-gray-200 rounded-xl text-sm font-medium text-gray-600 hover:bg-gray-50 transition-colors"
                                 >
                                     Cancel
                                 </button>
                                 <button
                                     type="submit"
-                                    className="flex-1 px-4 py-2.5 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors shadow-md shadow-blue-200"
+                                    className="flex-1 px-4 py-2.5 bg-blue-600 text-white rounded-xl text-sm font-semibold hover:bg-blue-700 transition-colors shadow-md shadow-blue-200"
                                 >
-                                    {editingBlog ? 'Update Blog' : 'Create Blog'}
+                                    {editingBlog ? 'Update Blog' : 'Publish Blog'}
                                 </button>
                             </div>
                         </form>
