@@ -83,7 +83,7 @@ function AddUserForm({ formData, setFormData, onSubmit, submitting }) {
       <div className="space-y-4 border p-4 rounded-lg bg-muted/20">
         <div className="space-y-2">
           <Label>Role</Label>
-          <div className="flex gap-2 mb-2">
+          <div className="flex gap-2 mb-2 flex-wrap">
             <Button
               type="button"
               variant={formData.role === 'admin' ? 'default' : 'outline'}
@@ -499,7 +499,7 @@ export default function Users() {
                 Add User
               </Button>
             </DialogTrigger>
-            <DialogContent className="bg-card max-w-md">
+            <DialogContent className="bg-card max-w-md max-h-[90vh] overflow-y-auto">
               <DialogHeader>
                 <DialogTitle>Create New User</DialogTitle>
               </DialogHeader>
@@ -643,7 +643,7 @@ export default function Users() {
           setEditFormData({ name: '', email: '', role: 'user', permissions: [] });
         }
       }}>
-        <DialogContent className="bg-card max-w-md">
+        <DialogContent className="bg-card max-w-md max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Edit User</DialogTitle>
           </DialogHeader>
