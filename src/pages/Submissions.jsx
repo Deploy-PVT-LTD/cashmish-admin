@@ -18,7 +18,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Search, Eye, ChevronLeft, ChevronRight, Loader2, MapPin, Phone, Calendar, Clock, Download, X, DollarSign, RefreshCw, Pencil, AlertCircle } from 'lucide-react';
+import { Search, Eye, ChevronLeft, ChevronRight, Loader2, MapPin, Phone, Calendar, Clock, Download, X, DollarSign, RefreshCw, Pencil, AlertCircle, Trash2 } from 'lucide-react';
+import Swal from 'sweetalert2';
 import { toast } from 'sonner';
 import { formApi } from '@/lib/api';
 import { format } from 'date-fns';
@@ -96,6 +97,28 @@ export default function Submissions() {
       toast.error('Failed to update status');
     } finally {
       setUpdating(false);
+    }
+  };
+
+  const handleSoftDelete = async (id) => {
+    const result = await Swal.fire({
+      title: 'Delete this submission?',
+      text: "It will be marked as deleted (strikethrough) but not permanently removed.",
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#ef4444',
+      cancelButtonColor: '#6b7280',
+      confirmButtonText: 'Yes, delete it!'
+    });
+    if (result.isConfirmed) {
+      try {
+        await formApi.delete(id);
+        await fetchSubmissions();
+        Swal.fire({ icon: 'success', title: 'Deleted!', text: 'Submission has been soft-deleted.', toast: true, position: 'top-end', showConfirmButton: false, timer: 3000 });
+      } catch (error) {
+        console.error('Error deleting submission:', error);
+        toast.error('Failed to delete submission');
+      }
     }
   };
 
@@ -261,18 +284,20 @@ export default function Submissions() {
           {/* Mobile Cards View */}
           <div className="block lg:hidden space-y-3">
             {filteredSubmissions.map((submission) => (
-              <div key={submission._id} className="stat-card">
+              <div key={submission._id} className={`stat-card ${submission.isDeleted ? 'opacity-50' : ''}`}>
                 <div className="flex items-start justify-between mb-3">
                   <div className="min-w-0 flex-1 mr-2">
                     <p className="text-xs font-bold text-primary mb-0.5">
-                      {submission.submissionId ? `CM#${submission.submissionId}` : `#${submission._id.slice(-4).toUpperCase()}`}
+                      CM#{submission.submissionId || '?'}
                     </p>
-                    <p className="font-medium text-foreground truncate">{submission.pickUpDetails?.fullName}</p>
-                    <p className="text-xs text-muted-foreground truncate">{submission.pickUpDetails?.phoneNumber}</p>
+                    <p className={`font-medium text-foreground truncate ${submission.isDeleted ? 'line-through text-muted-foreground' : ''}`}>{submission.pickUpDetails?.fullName}</p>
+                    <p className={`text-xs text-muted-foreground truncate ${submission.isDeleted ? 'line-through' : ''}`}>{submission.pickUpDetails?.phoneNumber}</p>
                   </div>
-                  {getStatusBadge(submission.status)}
+                  {submission.isDeleted ? (
+                    <span className="px-2 py-1 rounded-full text-xs font-bold bg-red-100 text-red-600">Deleted</span>
+                  ) : getStatusBadge(submission.status)}
                 </div>
-                <div className="space-y-2 text-sm">
+                <div className={`space-y-2 text-sm ${submission.isDeleted ? 'line-through text-muted-foreground' : ''}`}>
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Phone:</span>
                     <span className="text-foreground font-medium truncate ml-2 max-w-[150px]">
@@ -295,20 +320,29 @@ export default function Submissions() {
                   )}
                 </div>
                 <div className="mt-4 pt-3 border-t border-border flex gap-2">
-                  <Button variant="outline" size="sm" className="flex-1" onClick={() => setSelectedSubmission(submission)}>
-                    <Eye className="w-4 h-4 mr-2" />
-                    View
-                  </Button>
-                  {submission.status === 'pending' && (
-                    <Button size="sm" className="flex-1 bg-info hover:bg-info/90" onClick={() => openBidModal(submission)}>
-                      <DollarSign className="w-4 h-4 mr-2" />
-                      Bid
-                    </Button>
+                  {!submission.isDeleted && (
+                    <>
+                      <Button variant="outline" size="sm" className="flex-1" onClick={() => setSelectedSubmission(submission)}>
+                        <Eye className="w-4 h-4 mr-2" />
+                        View
+                      </Button>
+                      {submission.status === 'pending' && (
+                        <Button size="sm" className="flex-1 bg-info hover:bg-info/90" onClick={() => openBidModal(submission)}>
+                          <DollarSign className="w-4 h-4 mr-2" />
+                          Bid
+                        </Button>
+                      )}
+                      {submission.bidPrice > 0 && ['pending', 'bid_placed'].includes(submission.status) && (
+                        <Button size="sm" variant="outline" className="flex-1" onClick={() => openBidModal(submission, true)}>
+                          <Pencil className="w-4 h-4 mr-2" />
+                          Edit Bid
+                        </Button>
+                      )}
+                    </>
                   )}
-                  {submission.bidPrice > 0 && ['pending', 'bid_placed'].includes(submission.status) && (
-                    <Button size="sm" variant="outline" className="flex-1" onClick={() => openBidModal(submission, true)}>
-                      <Pencil className="w-4 h-4 mr-2" />
-                      Edit Bid
+                  {!submission.isDeleted && (
+                    <Button size="sm" variant="outline" className="text-red-500 hover:text-red-600 hover:bg-red-50" onClick={() => handleSoftDelete(submission._id)}>
+                      <Trash2 className="w-4 h-4" />
                     </Button>
                   )}
                 </div>
@@ -335,45 +369,56 @@ export default function Submissions() {
                 </thead>
                 <tbody>
                   {filteredSubmissions.map((submission) => (
-                    <tr key={submission._id} className="border-t border-border hover:bg-muted/30 transition-colors">
+                    <tr key={submission._id} className={`border-t border-border transition-colors ${submission.isDeleted ? 'opacity-50 bg-red-50/30' : 'hover:bg-muted/30'}`}>
                       <td className="px-6 py-4">
-                        <span className="inline-flex items-center px-2 py-1 rounded-md bg-primary/10 text-primary text-xs font-bold">
-                          {submission.submissionId ? `CM#${submission.submissionId}` : `#${submission._id.slice(-4).toUpperCase()}`}
+                        <span className={`inline-flex items-center px-2 py-1 rounded-md text-xs font-bold ${submission.isDeleted ? 'bg-red-100 text-red-500 line-through' : 'bg-primary/10 text-primary'}`}>
+                          CM#{submission.submissionId || '?'}
                         </span>
                       </td>
                       <td className="px-6 py-4">
                         <div className="min-w-0">
-                          <p className="text-sm font-medium text-foreground truncate max-w-[150px]">{submission.pickUpDetails?.fullName}</p>
-                          <p className="text-xs text-muted-foreground truncate max-w-[150px]">{submission.pickUpDetails?.phoneNumber}</p>
+                          <p className={`text-sm font-medium truncate max-w-[150px] ${submission.isDeleted ? 'line-through text-muted-foreground' : 'text-foreground'}`}>{submission.pickUpDetails?.fullName}</p>
+                          <p className={`text-xs truncate max-w-[150px] ${submission.isDeleted ? 'line-through' : ''} text-muted-foreground`}>{submission.pickUpDetails?.phoneNumber}</p>
                         </div>
                       </td>
-                      <td className="px-6 py-4 text-sm text-foreground">
+                      <td className={`px-6 py-4 text-sm ${submission.isDeleted ? 'line-through text-muted-foreground' : 'text-foreground'}`}>
                         {submission.mobileId?.brand} {submission.mobileId?.phoneModel}
                       </td>
-                      <td className="px-6 py-4 text-sm text-muted-foreground">{submission.storage}</td>
+                      <td className={`px-6 py-4 text-sm ${submission.isDeleted ? 'line-through' : ''} text-muted-foreground`}>{submission.storage}</td>
                       <td className="px-6 py-4">
-                        <div className="text-xs space-y-1">
+                        <div className={`text-xs space-y-1 ${submission.isDeleted ? 'line-through' : ''}`}>
                           <p className="text-muted-foreground">Screen: <span className="text-foreground">{getConditionLabel('screenCondition', submission.screenCondition)}</span></p>
                           <p className="text-muted-foreground">Body: <span className="text-foreground">{getConditionLabel('bodyCondition', submission.bodyCondition)}</span></p>
                         </div>
                       </td>
-                      <td className="px-6 py-4 text-sm font-medium text-foreground">${submission.estimatedPrice?.toLocaleString() || 'N/A'}</td>
-                      <td className="px-6 py-4 text-sm font-bold text-info">{submission.bidPrice > 0 ? `$${submission.bidPrice.toLocaleString()}` : '-'}</td>
-                      <td className="px-6 py-4">{getStatusBadge(submission.status)}</td>
+                      <td className={`px-6 py-4 text-sm font-medium ${submission.isDeleted ? 'line-through text-muted-foreground' : 'text-foreground'}`}>${submission.estimatedPrice?.toLocaleString() || 'N/A'}</td>
+                      <td className={`px-6 py-4 text-sm font-bold ${submission.isDeleted ? 'line-through text-muted-foreground' : 'text-info'}`}>{submission.bidPrice > 0 ? `$${submission.bidPrice.toLocaleString()}` : '-'}</td>
+                      <td className="px-6 py-4">
+                        {submission.isDeleted ? (
+                          <span className="px-2 py-1 rounded-full text-xs font-bold bg-red-100 text-red-600">Deleted</span>
+                        ) : getStatusBadge(submission.status)}
+                      </td>
                       <td className="px-6 py-4 text-right">
                         <div className="flex justify-end gap-1">
-                          <Button variant="ghost" size="sm" onClick={() => setSelectedSubmission(submission)}>
-                            <Eye className="w-4 h-4" />
-                          </Button>
-                          {submission.status === 'pending' && (
-                            <Button variant="ghost" size="sm" className="text-info hover:text-info" onClick={() => openBidModal(submission)}>
-                              <DollarSign className="w-4 h-4" />
-                            </Button>
-                          )}
-                          {submission.bidPrice > 0 && ['pending', 'bid_placed'].includes(submission.status) && (
-                            <Button variant="ghost" size="sm" className="text-warning hover:text-warning" onClick={() => openBidModal(submission, true)}>
-                              <Pencil className="w-4 h-4" />
-                            </Button>
+                          {!submission.isDeleted && (
+                            <>
+                              <Button variant="ghost" size="sm" onClick={() => setSelectedSubmission(submission)}>
+                                <Eye className="w-4 h-4" />
+                              </Button>
+                              {submission.status === 'pending' && (
+                                <Button variant="ghost" size="sm" className="text-info hover:text-info" onClick={() => openBidModal(submission)}>
+                                  <DollarSign className="w-4 h-4" />
+                                </Button>
+                              )}
+                              {submission.bidPrice > 0 && ['pending', 'bid_placed'].includes(submission.status) && (
+                                <Button variant="ghost" size="sm" className="text-warning hover:text-warning" onClick={() => openBidModal(submission, true)}>
+                                  <Pencil className="w-4 h-4" />
+                                </Button>
+                              )}
+                              <Button variant="ghost" size="sm" className="text-red-400 hover:text-red-600 hover:bg-red-50" onClick={() => handleSoftDelete(submission._id)}>
+                                <Trash2 className="w-4 h-4" />
+                              </Button>
+                            </>
                           )}
                         </div>
                       </td>
