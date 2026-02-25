@@ -31,9 +31,8 @@ export function AuthProvider({ children }) {
   const login = async (email, password) => {
     const response = await authApi.login(email, password);
 
-    // Check if user has admin role
-    const allowedRoles = ['admin', 'superadmin', 'accountant'];
-    if (!allowedRoles.includes(response.user?.role)) {
+    // Check if user has admin role (reject strictly normal 'user' role)
+    if (response.user?.role === 'user') {
       throw new Error('Access denied. Only admins can login to this panel.');
     }
 

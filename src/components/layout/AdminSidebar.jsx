@@ -49,10 +49,20 @@ export function AdminSidebar({ collapsed, setCollapsed }) {
   const navigate = useNavigate();
   const { logout, user } = useAuth(); // Get user from auth context
 
-  // Filter nav items based on role
-  const filteredNavItems = navItems.filter(item =>
-    !item.allowedRoles || (user && item.allowedRoles.includes(user.role))
-  );
+  // Filter nav items based on role or specific permissions
+  const filteredNavItems = navItems.filter(item => {
+    if (!item.allowedRoles) return true;
+    if (!user) return false;
+
+    // Superadmin has access to everything
+    if (user.role === 'superadmin') return true;
+
+    // Check if user has predefined role access, or explicit path permission
+    const hasRoleAccess = item.allowedRoles.includes(user.role);
+    const hasPathPermission = user.permissions && user.permissions.includes(item.path);
+
+    return hasRoleAccess || hasPathPermission;
+  });
 
   const handleLogout = () => {
     logout();

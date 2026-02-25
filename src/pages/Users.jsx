@@ -30,9 +30,22 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Search, Mail, ChevronLeft, ChevronRight, Plus, Loader2, UserPlus, RefreshCw, Pencil, Trash2 } from 'lucide-react';
+import { Search, Mail, ChevronLeft, ChevronRight, Plus, Loader2, UserPlus, RefreshCw, Pencil, Trash2, CheckCircle2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { authApi } from '@/lib/api';
+import { Checkbox } from '@/components/ui/checkbox';
+
+// Define available pages for permissions
+const AVAILABLE_PAGES = [
+  { id: '/mobiles', label: 'Mobiles' },
+  { id: '/requests', label: 'Requests' },
+  { id: '/submissions', label: 'Submissions' },
+  { id: '/inventory', label: 'Inventory' },
+  { id: '/bank-details', label: 'Payment Details' },
+  { id: '/reviews', label: 'Reviews' },
+  { id: '/blogs', label: 'Blogs' },
+  { id: '/settings', label: 'Settings' },
+];
 
 // Form component moved OUTSIDE to prevent re-renders
 function AddUserForm({ formData, setFormData, onSubmit, submitting }) {
@@ -67,19 +80,74 @@ function AddUserForm({ formData, setFormData, onSubmit, submitting }) {
         />
       </div>
 
-      <div className="space-y-2">
-        <Label>Role</Label>
-        <Select value={formData.role} onValueChange={(value) => setFormData(prev => ({ ...prev, role: value }))}>
-          <SelectTrigger className="bg-background">
-            <SelectValue placeholder="Select role" />
-          </SelectTrigger>
-          <SelectContent className="bg-card border-border z-50">
-            <SelectItem value="user">User</SelectItem>
-            <SelectItem value="admin">Admin</SelectItem>
-            <SelectItem value="accountant">Accountant</SelectItem>
-            <SelectItem value="superadmin">Super Admin</SelectItem>
-          </SelectContent>
-        </Select>
+      <div className="space-y-4 border p-4 rounded-lg bg-muted/20">
+        <div className="space-y-2">
+          <Label>Role</Label>
+          <div className="flex gap-2 mb-2">
+            <Button
+              type="button"
+              variant={formData.role === 'admin' ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => setFormData(prev => ({ ...prev, role: 'admin', permissions: AVAILABLE_PAGES.map(p => p.id) }))}
+            >
+              Admin (All Access)
+            </Button>
+            <Button
+              type="button"
+              variant={formData.role === 'superadmin' ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => setFormData(prev => ({ ...prev, role: 'superadmin', permissions: ['*'] }))}
+            >
+              Super Admin
+            </Button>
+            <Button
+              type="button"
+              variant={!['admin', 'superadmin', 'user'].includes(formData.role) && formData.role !== '' ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => setFormData(prev => ({ ...prev, role: 'Editor', permissions: [] }))}
+            >
+              Custom Role
+            </Button>
+          </div>
+          <Input
+            placeholder="Type role name (e.g. Sales, Content Editor)"
+            value={formData.role}
+            onChange={(e) => setFormData(prev => ({ ...prev, role: e.target.value }))}
+          />
+        </div>
+
+        {formData.role !== 'superadmin' && (
+          <div className="space-y-3 pt-2">
+            <Label>Page Permissions</Label>
+            <div className="grid grid-cols-2 gap-3">
+              {AVAILABLE_PAGES.map((page) => (
+                <div key={page.id} className="flex items-center space-x-2">
+                  <Checkbox
+                    id={`add-${page.id}`}
+                    checked={formData.permissions.includes(page.id)}
+                    onCheckedChange={(checked) => {
+                      setFormData(prev => {
+                        const newPerms = checked
+                          ? [...prev.permissions, page.id]
+                          : prev.permissions.filter(p => p !== page.id);
+                        return { ...prev, permissions: newPerms };
+                      });
+                    }}
+                  />
+                  <label
+                    htmlFor={`add-${page.id}`}
+                    className="text-sm leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+                  >
+                    {page.label}
+                  </label>
+                </div>
+              ))}
+            </div>
+            <p className="text-xs text-muted-foreground mt-2">
+              Note: Dashboard is always accessible. Superadmin has access to everything including Users management.
+            </p>
+          </div>
+        )}
       </div>
 
       <Button
@@ -126,19 +194,72 @@ function EditUserForm({ formData, setFormData, onSubmit, submitting }) {
         />
       </div>
 
-      <div className="space-y-2">
-        <Label>Role</Label>
-        <Select value={formData.role} onValueChange={(value) => setFormData(prev => ({ ...prev, role: value }))}>
-          <SelectTrigger className="bg-background">
-            <SelectValue placeholder="Select role" />
-          </SelectTrigger>
-          <SelectContent className="bg-card border-border z-50">
-            <SelectItem value="user">User</SelectItem>
-            <SelectItem value="admin">Admin</SelectItem>
-            <SelectItem value="accountant">Accountant</SelectItem>
-            <SelectItem value="superadmin">Super Admin</SelectItem>
-          </SelectContent>
-        </Select>
+      <div className="space-y-4 border p-4 rounded-lg bg-muted/20">
+        <div className="space-y-2">
+          <Label>Role</Label>
+          <div className="flex gap-2 mb-2 flex-wrap">
+            <Button
+              type="button"
+              variant={formData.role === 'admin' ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => setFormData(prev => ({ ...prev, role: 'admin', permissions: AVAILABLE_PAGES.map(p => p.id) }))}
+            >
+              Admin
+            </Button>
+            <Button
+              type="button"
+              variant={formData.role === 'superadmin' ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => setFormData(prev => ({ ...prev, role: 'superadmin', permissions: ['*'] }))}
+            >
+              Super Admin
+            </Button>
+            <Button
+              type="button"
+              variant={formData.role === 'user' ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => setFormData(prev => ({ ...prev, role: 'user', permissions: [] }))}
+            >
+              User
+            </Button>
+          </div>
+          <Input
+            placeholder="Type custom role name (e.g. Sales)"
+            value={formData.role}
+            onChange={(e) => setFormData(prev => ({ ...prev, role: e.target.value }))}
+          />
+        </div>
+
+        {formData.role !== 'superadmin' && (
+          <div className="space-y-3 pt-2">
+            <Label>Page Permissions</Label>
+            <div className="grid grid-cols-2 gap-3">
+              {AVAILABLE_PAGES.map((page) => (
+                <div key={page.id} className="flex items-center space-x-2">
+                  <Checkbox
+                    id={`edit-${page.id}`}
+                    checked={formData.permissions?.includes(page.id) || false}
+                    onCheckedChange={(checked) => {
+                      setFormData(prev => {
+                        const currentPerms = prev.permissions || [];
+                        const newPerms = checked
+                          ? [...currentPerms, page.id]
+                          : currentPerms.filter(p => p !== page.id);
+                        return { ...prev, permissions: newPerms };
+                      });
+                    }}
+                  />
+                  <label
+                    htmlFor={`edit-${page.id}`}
+                    className="text-sm leading-none cursor-pointer"
+                  >
+                    {page.label}
+                  </label>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
 
       <Button
@@ -175,12 +296,14 @@ export default function Users() {
     name: '',
     email: '',
     password: '',
-    role: 'user',
+    role: 'admin',
+    permissions: AVAILABLE_PAGES.map(p => p.id), // Default admin has all permissions
   });
   const [editFormData, setEditFormData] = useState({
     name: '',
     email: '',
     role: 'user',
+    permissions: [],
   });
 
   // Pagination State
@@ -267,6 +390,7 @@ export default function Users() {
         email: formData.email,
         password: formData.password,
         role: formData.role,
+        permissions: formData.permissions,
       });
 
       // Refresh users list
@@ -294,12 +418,13 @@ export default function Users() {
         name: editFormData.name,
         email: editFormData.email,
         role: editFormData.role,
+        permissions: editFormData.permissions,
       });
 
       await fetchUsers();
 
       setEditingUser(null);
-      setEditFormData({ name: '', email: '', role: 'user' });
+      setEditFormData({ name: '', email: '', role: 'user', permissions: [] });
       setIsEditModalOpen(false);
       toast.success('User updated successfully!');
     } catch (error) {
@@ -333,12 +458,13 @@ export default function Users() {
       name: user.name || '',
       email: user.email || '',
       role: user.role || 'user',
+      permissions: user.permissions || [],
     });
     setIsEditModalOpen(true);
   };
 
   const resetForm = () => {
-    setFormData({ name: '', email: '', password: '', role: 'user' });
+    setFormData({ name: '', email: '', password: '', role: 'admin', permissions: AVAILABLE_PAGES.map(p => p.id) });
   };
 
   // Loading check moved inside render to keep inputs mounted
@@ -514,7 +640,7 @@ export default function Users() {
         setIsEditModalOpen(open);
         if (!open) {
           setEditingUser(null);
-          setEditFormData({ name: '', email: '', role: 'user' });
+          setEditFormData({ name: '', email: '', role: 'user', permissions: [] });
         }
       }}>
         <DialogContent className="bg-card max-w-md">
