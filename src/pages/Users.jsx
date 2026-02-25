@@ -37,7 +37,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 
 // Define available pages for permissions
 const AVAILABLE_PAGES = [
-  { id: '/dashboard', label: 'Dashboard' },
+  { id: '/', label: 'Dashboard' },
   { id: '/mobiles', label: 'Mobiles' },
   { id: '/requests', label: 'Requests' },
   { id: '/submissions', label: 'Submissions' },
