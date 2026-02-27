@@ -39,6 +39,7 @@ const navItems = [
   { icon: FileText, label: 'Blogs', path: '/blogs', allowedRoles: ['superadmin', 'admin'] },
   { icon: Users, label: 'Users', path: '/users', allowedRoles: ['superadmin'] },
   // { icon: BarChart3, label: 'Analytics', path: '/analytics' },
+  { icon: MessageSquare, label: 'Support Chats', path: '/support-chats', allowedRoles: ['superadmin', 'admin'] },
   { icon: Settings, label: 'Settings', path: '/settings', allowedRoles: ['superadmin', 'admin', 'accountant'] },
 ];
 
