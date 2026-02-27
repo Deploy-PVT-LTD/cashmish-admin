@@ -1,7 +1,7 @@
 import axios from 'axios';
 
-// const API_BASE_URL = 'http://localhost:5000/api';
-const API_BASE_URL = 'https://cashmish-backend.onrender.com/api';
+// export const API_BASE_URL = 'http://localhost:5000/api';
+export const API_BASE_URL = 'https://cashmish-backend.onrender.com/api';
 
 const api = axios.create({
   baseURL: API_BASE_URL,
@@ -248,6 +248,33 @@ export const couponApi = {
   // Delete coupon
   delete: async (id) => {
     const response = await api.delete(`/coupons/${id}`);
+    return response.data;
+  }
+};
+
+// Chat API
+export const chatApi = {
+  // Get all active sessions
+  getSessions: async () => {
+    const response = await api.get('/chat/sessions');
+    return response.data;
+  },
+
+  // Get chat history by session ID
+  getSessionHistory: async (sessionId) => {
+    const response = await api.get(`/chat/${sessionId}`);
+    return response.data;
+  },
+
+  // Resolve (Close) chat session
+  resolveSession: async (sessionId) => {
+    const response = await api.put(`/chat/${sessionId}/status`, { status: 'closed' });
+    return response.data;
+  },
+
+  // Delete chat session
+  deleteSession: async (sessionId) => {
+    const response = await api.delete(`/chat/${sessionId}`);
     return response.data;
   }
 };

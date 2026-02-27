@@ -2,11 +2,12 @@ import { useState, useEffect, useRef } from 'react';
 import { AdminLayout } from '@/components/layout/AdminLayout';
 import { io } from 'socket.io-client';
 import { format } from 'date-fns';
-import { Send, User as UserIcon, Loader2, MessageSquare, CheckCircle2 } from 'lucide-react';
+import { Send, User as UserIcon, Loader2, MessageSquare, CheckCircle2, Trash2, Check, AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
-import { API_BASE_URL } from '@/lib/api';
+import { API_BASE_URL, chatApi } from '@/lib/api';
 
-const SOCKET_URL = API_BASE_URL;
+// Derive SOCKET_URL from API_BASE_URL by removing the trailing '/api'
+const SOCKET_URL = API_BASE_URL ? API_BASE_URL.replace(/\/api\/?$/, '') : 'https://cashmish-backend.onrender.com';
 
 export default function SupportChats() {
     const [socket, setSocket] = useState(null);
@@ -15,18 +16,22 @@ export default function SupportChats() {
     const [messages, setMessages] = useState([]);
     const [inputValue, setInputValue] = useState('');
     const [loading, setLoading] = useState(true);
+    const [confirmDialog, setConfirmDialog] = useState({ isOpen: false, type: null, sessionId: null });
     const messagesEndRef = useRef(null);
 
     // Initialize Socket.io connection
     useEffect(() => {
-        const newSocket = io(SOCKET_URL);
+        const newSocket = io(SOCKET_URL, {
+            transports: ['websocket', 'polling'],
+            reconnectionAttempts: 5,
+            reconnectionDelay: 1000,
+        });
         setSocket(newSocket);
 
         // Fetch initial active sessions
         const fetchSessions = async () => {
             try {
-                const response = await fetch(`${SOCKET_URL}/api/chat/sessions`);
-                const data = await response.json();
+                const data = await chatApi.getSessions();
                 setSessions(data);
                 setLoading(false);
             } catch (error) {
@@ -102,6 +107,50 @@ export default function SupportChats() {
         setInputValue('');
     };
 
+    const handleDeleteSession = (sessionId) => {
+        setConfirmDialog({ isOpen: true, type: 'delete', sessionId });
+    };
+
+    const handleResolveSession = (sessionId) => {
+        setConfirmDialog({ isOpen: true, type: 'resolve', sessionId });
+    };
+
+    const handleConfirmAction = async () => {
+        const { type, sessionId } = confirmDialog;
+        if (!sessionId) return;
+
+        setConfirmDialog({ isOpen: false, type: null, sessionId: null });
+
+        if (type === 'delete') {
+            try {
+                await chatApi.deleteSession(sessionId);
+                socket?.emit('admin_action', { sessionId, action: 'deleted' });
+                setSessions(prev => prev.filter(s => s.sessionId !== sessionId));
+                if (activeSession?.sessionId === sessionId) {
+                    setActiveSession(null);
+                    setMessages([]);
+                }
+                toast.success('Chat deleted successfully');
+            } catch (error) {
+                toast.error('Failed to delete chat');
+                console.error(error);
+            }
+        } else if (type === 'resolve') {
+            try {
+                await chatApi.resolveSession(sessionId);
+                socket?.emit('admin_action', { sessionId, action: 'resolved' });
+                setSessions(prev => prev.map(s => s.sessionId === sessionId ? { ...s, status: 'closed' } : s));
+                if (activeSession?.sessionId === sessionId) {
+                    setActiveSession({ ...activeSession, status: 'closed' });
+                }
+                toast.success('Chat marked as resolved');
+            } catch (error) {
+                toast.error('Failed to resolve chat');
+                console.error(error);
+            }
+        }
+    };
+
     return (
         <AdminLayout title="Support Chats" subtitle="Real-time live customer support">
             <div className="flex h-[calc(100vh-140px)] w-full bg-white rounded-2xl shadow-xl overflow-hidden border border-gray-100">
@@ -147,7 +196,7 @@ export default function SupportChats() {
                                             <div className="flex-1 min-w-0">
                                                 <div className="flex justify-between items-center mb-1">
                                                     <span className="font-medium text-sm text-gray-900 truncate">
-                                                        Guest-{session.sessionId.substring(0, 5)}
+                                                        {session.userName ? session.userName : `Guest-${session.sessionId.substring(0, 5)}`}
                                                     </span>
                                                     <span className="text-[10px] text-gray-400 whitespace-nowrap ml-2">
                                                         {format(new Date(session.lastActive), 'pp')}
@@ -156,6 +205,9 @@ export default function SupportChats() {
                                                 <p className={`text-xs truncate ${lastMessage?.sender === 'user' ? 'text-gray-900 font-medium' : 'text-gray-500'}`}>
                                                     {lastMessage?.sender === 'admin' ? 'You: ' : ''}{lastMessage?.text || 'No messages'}
                                                 </p>
+                                                {session.status === 'closed' && (
+                                                    <span className="text-[10px] px-1.5 py-0.5 bg-gray-100 text-gray-500 rounded border border-gray-200 mt-1 inline-block">Resolved</span>
+                                                )}
                                             </div>
                                         </button>
                                     );
@@ -176,7 +228,9 @@ export default function SupportChats() {
                                         <UserIcon className="w-5 h-5 text-primary" />
                                     </div>
                                     <div>
-                                        <h3 className="font-bold text-gray-800 leading-tight">Guest-{activeSession.sessionId.substring(0, 5)}</h3>
+                                        <h3 className="font-bold text-gray-800 leading-tight">
+                                            {activeSession.userName ? activeSession.userName : `Guest-${activeSession.sessionId.substring(0, 5)}`}
+                                        </h3>
                                         <div className="flex items-center gap-1.5 text-xs text-green-600 font-medium">
                                             <span className="relative flex h-2 w-2">
                                                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
@@ -186,7 +240,33 @@ export default function SupportChats() {
                                         </div>
                                     </div>
                                 </div>
+
+                                <div className="flex items-center gap-2">
+                                    {activeSession.status !== 'closed' && (
+                                        <button
+                                            onClick={() => handleResolveSession(activeSession.sessionId)}
+                                            className="p-2 text-green-600 hover:bg-green-50 rounded-full transition-colors"
+                                            title="Mark as Resolved"
+                                        >
+                                            <Check className="w-5 h-5" />
+                                        </button>
+                                    )}
+                                    <button
+                                        onClick={() => handleDeleteSession(activeSession.sessionId)}
+                                        className="p-2 text-red-500 hover:bg-red-50 rounded-full transition-colors"
+                                        title="Delete Chat"
+                                    >
+                                        <Trash2 className="w-5 h-5" />
+                                    </button>
+                                </div>
                             </div>
+
+                            {activeSession.status === 'closed' && (
+                                <div className="bg-gray-50 border-b border-gray-100 py-2 px-6 flex items-center justify-center gap-2 text-sm text-gray-500">
+                                    <AlertCircle className="w-4 h-4" />
+                                    This conversation has been resolved and closed.
+                                </div>
+                            )}
 
                             {/* Chat Messages */}
                             <div className="flex-1 overflow-y-auto p-6 flex flex-col gap-4 custom-scrollbar">
@@ -230,7 +310,7 @@ export default function SupportChats() {
                                     />
                                     <button
                                         type="submit"
-                                        disabled={!inputValue.trim()}
+                                        disabled={!inputValue.trim() || activeSession.status === 'closed'}
                                         className="absolute right-2 top-1.5 bottom-1.5 aspect-square bg-primary text-primary-foreground rounded-full flex items-center justify-center hover:bg-primary/90 hover:scale-105 active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-md cursor-pointer"
                                     >
                                         <Send className="w-4 h-4 ml-0.5" />
@@ -249,6 +329,43 @@ export default function SupportChats() {
                     )}
                 </div>
             </div>
+
+            {/* Confirmation Modal overlay */}
+            {confirmDialog.isOpen && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 backdrop-blur-sm animate-in fade-in duration-200">
+                    <div className="bg-white rounded-xl shadow-2xl w-full max-w-sm p-6 animate-in zoom-in-95 duration-200 m-4">
+                        <div className="flex items-center gap-3 mb-4">
+                            <div className={`p-2 rounded-full ${confirmDialog.type === 'delete' ? 'bg-red-100 text-red-600' : 'bg-green-100 text-green-600'}`}>
+                                {confirmDialog.type === 'delete' ? <Trash2 className="w-5 h-5" /> : <CheckCircle2 className="w-5 h-5" />}
+                            </div>
+                            <h3 className="text-lg font-semibold text-gray-900 border-none m-0 p-0">
+                                {confirmDialog.type === 'delete' ? 'Delete Conversation?' : 'Resolve Conversation?'}
+                            </h3>
+                        </div>
+                        <p className="text-sm text-gray-500 mb-6 leading-relaxed">
+                            {confirmDialog.type === 'delete'
+                                ? 'Are you sure you want to permanently delete this chat? The user will be disconnected and all history will be lost.'
+                                : 'Are you sure you want to mark this conversation as resolved? The chat will be closed for the user.'}
+                        </p>
+                        <div className="flex justify-end gap-3">
+                            <button
+                                onClick={() => setConfirmDialog({ isOpen: false, type: null, sessionId: null })}
+                                className="px-4 py-2 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-100 transition-colors cursor-pointer"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={handleConfirmAction}
+                                className={`px-4 py-2 rounded-lg text-sm font-medium text-white transition-colors cursor-pointer shadow-sm ${confirmDialog.type === 'delete' ? 'bg-red-600 hover:bg-red-700 shadow-red-600/20' : 'bg-primary hover:bg-primary/90 shadow-primary/20'
+                                    }`}
+                            >
+                                {confirmDialog.type === 'delete' ? 'Delete' : 'Resolve'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             <style dangerouslySetInnerHTML={{
                 __html: `
         .custom-scrollbar::-webkit-scrollbar {
@@ -265,6 +382,6 @@ export default function SupportChats() {
           background-color: #d1d5db;
         }
       `}} />
-        </AdminLayout>
+        </AdminLayout >
     );
 }
