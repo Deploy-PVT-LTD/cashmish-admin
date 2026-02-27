@@ -45,6 +45,7 @@ const AVAILABLE_PAGES = [
   { id: '/bank-details', label: 'Payment Details' },
   { id: '/reviews', label: 'Reviews' },
   { id: '/blogs', label: 'Blogs' },
+  { id: '/support-chats', label: 'Support Chats' },
   { id: '/settings', label: 'Settings' },
 ];
 
