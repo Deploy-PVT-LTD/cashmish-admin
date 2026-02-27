@@ -4,8 +4,9 @@ import { io } from 'socket.io-client';
 import { format } from 'date-fns';
 import { Send, User as UserIcon, Loader2, MessageSquare, CheckCircle2 } from 'lucide-react';
 import { toast } from 'sonner';
+import { API_BASE_URL } from '@/lib/api';
 
-const SOCKET_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+const SOCKET_URL = API_BASE_URL;
 
 export default function SupportChats() {
     const [socket, setSocket] = useState(null);
@@ -136,8 +137,8 @@ export default function SupportChats() {
                                             key={session.sessionId}
                                             onClick={() => handleSelectSession(session)}
                                             className={`flex items-start gap-4 p-4 pr-6 w-full text-left transition-all border-l-4 ${isActive
-                                                    ? 'bg-primary/5 border-primary shadow-inner shadow-primary/5'
-                                                    : 'bg-transparent border-transparent hover:bg-white cursor-pointer'
+                                                ? 'bg-primary/5 border-primary shadow-inner shadow-primary/5'
+                                                : 'bg-transparent border-transparent hover:bg-white cursor-pointer'
                                                 } border-b border-gray-50`}
                                         >
                                             <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary/20 to-primary/10 flex items-center justify-center flex-shrink-0">
@@ -199,8 +200,8 @@ export default function SupportChats() {
                                                 <div className="flex flex-col max-w-[70%]">
                                                     <div
                                                         className={`p-3.5 rounded-2xl shadow-sm text-sm leading-relaxed ${isAdmin
-                                                                ? 'bg-primary text-primary-foreground rounded-tr-sm'
-                                                                : 'bg-white border border-gray-100 text-gray-800 rounded-tl-sm'
+                                                            ? 'bg-primary text-primary-foreground rounded-tr-sm'
+                                                            : 'bg-white border border-gray-100 text-gray-800 rounded-tl-sm'
                                                             }`}
                                                     >
                                                         {msg.text}
