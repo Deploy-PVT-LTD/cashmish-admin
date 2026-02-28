@@ -1,8 +1,8 @@
 import axios from 'axios';
 
 // export const API_BASE_URL = 'http://localhost:5000/api';
-export const API_BASE_URL = 'https://cashmish-backend.onrender.com/api';
-// export const API_BASE_URL = 'http://192.168.1.11:5000/api';
+// export const API_BASE_URL = 'https://cashmish-backend.onrender.com/api';
+export const API_BASE_URL = 'http://192.168.1.11:5000/api';
 
 const api = axios.create({
   baseURL: API_BASE_URL,
