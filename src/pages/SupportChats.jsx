@@ -7,7 +7,7 @@ import { toast } from 'sonner';
 import { API_BASE_URL, chatApi } from '@/lib/api';
 
 // Derive SOCKET_URL from API_BASE_URL by removing the trailing '/api'
-const SOCKET_URL = API_BASE_URL ? API_BASE_URL.replace(/\/api\/?$/, '') : 'https://cashmish-backend.onrender.com';
+const SOCKET_URL = API_BASE_URL ? API_BASE_URL.replace(/\/api\/?$/, '') : 'http://192.168.1.11:5000';
 
 export default function SupportChats() {
     const [socket, setSocket] = useState(null);
