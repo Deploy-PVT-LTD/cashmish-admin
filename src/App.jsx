@@ -37,7 +37,7 @@ const App = () => (
             <Route path="/login" element={<Login />} />
 
             {/* Common Routes */}
-            <Route path="/" element={<ProtectedRoute><Index /></ProtectedRoute>} />
+            <Route path="/" element={<ProtectedRoute allowedRoles={['superadmin', 'admin', 'accountant']}><Index /></ProtectedRoute>} />
 
             {/* Admin & Super Admin */}
             <Route path="/mobiles" element={<ProtectedRoute allowedRoles={['superadmin', 'admin']}><Mobiles /></ProtectedRoute>} />

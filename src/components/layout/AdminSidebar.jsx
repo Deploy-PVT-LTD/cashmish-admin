@@ -52,17 +52,21 @@ export function AdminSidebar({ collapsed, setCollapsed }) {
 
   // Filter nav items based on role or specific permissions
   const filteredNavItems = navItems.filter(item => {
-    if (!item.allowedRoles) return true;
     if (!user) return false;
 
     // Superadmin has access to everything
     if (user.role === 'superadmin') return true;
 
-    // Check if user has predefined role access, or explicit path permission
-    const hasRoleAccess = item.allowedRoles.includes(user.role);
+    // Admin has access to allowedRoles that include 'admin'
+    if (user.role === 'admin' && item.allowedRoles && item.allowedRoles.includes('admin')) {
+      return true;
+    }
+
+    // For any other custom role, strictly check permissions array OR if the route is entirely public (no allowedRoles)
+    const isPublicRoute = !item.allowedRoles;
     const hasPathPermission = user.permissions && user.permissions.includes(item.path);
 
-    return hasRoleAccess || hasPathPermission;
+    return isPublicRoute || hasPathPermission;
   });
 
   const handleLogout = () => {
