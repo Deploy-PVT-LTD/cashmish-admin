@@ -208,6 +208,7 @@ const Blogs = () => {
     const [editingBlog, setEditingBlog] = useState(null);
     const [formData, setFormData] = useState({
         title: '',
+        slug: '',
         excerpt: '',
         content: '',
         author: '',
@@ -229,7 +230,7 @@ const Blogs = () => {
     useEffect(() => { fetchBlogs(); }, []);
 
     const resetForm = () => {
-        setFormData({ title: '', excerpt: '', content: '', author: '', image: '', status: 'draft' });
+        setFormData({ title: '', slug: '', excerpt: '', content: '', author: '', image: '', status: 'draft' });
         setEditingBlog(null);
     };
 
@@ -239,6 +240,7 @@ const Blogs = () => {
         setEditingBlog(blog);
         setFormData({
             title: blog.title,
+            slug: blog.slug || '',
             excerpt: blog.excerpt,
             content: blog.content || '',
             author: blog.author,
@@ -441,6 +443,18 @@ const Blogs = () => {
                                     onChange={(e) => setFormData({ ...formData, title: e.target.value })}
                                     className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
                                     placeholder="Blog post title"
+                                />
+                            </div>
+
+                            {/* Custom Slug */}
+                            <div>
+                                <label className="block text-sm font-semibold text-gray-700 mb-1.5">Custom Slug URL (Optional)</label>
+                                <input
+                                    type="text"
+                                    value={formData.slug}
+                                    onChange={(e) => setFormData({ ...formData, slug: e.target.value })}
+                                    className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                                    placeholder="e.g. why-sell-your-old-phone (auto-generated from excerpt if left blank)"
                                 />
                             </div>
 
