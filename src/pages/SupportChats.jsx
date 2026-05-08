@@ -4,10 +4,7 @@ import { io } from 'socket.io-client';
 import { format } from 'date-fns';
 import { Send, User as UserIcon, Loader2, MessageSquare, CheckCircle2, Trash2, Check, AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
-import { API_BASE_URL, chatApi } from '@/lib/api';
-
-// Derive SOCKET_URL from API_BASE_URL by removing the trailing '/api'
-const SOCKET_URL = API_BASE_URL ? API_BASE_URL.replace(/\/api\/?$/, '') : 'https://agamically-toothy-lisa.ngrok-free.dev';
+import { chatApi, getActiveURL } from '@/lib/api';
 
 export default function SupportChats() {
     const [socket, setSocket] = useState(null);
@@ -19,11 +16,14 @@ export default function SupportChats() {
     const [confirmDialog, setConfirmDialog] = useState({ isOpen: false, type: null, sessionId: null });
     const messagesEndRef = useRef(null);
 
-    // Initialize Socket.io connection
+    // Initialize Socket.io connection with fallback-aware URL
     useEffect(() => {
-        const newSocket = io(SOCKET_URL, {
+        const activeBase = getActiveURL();
+        const socketUrl = activeBase.replace(/\/api\/?$/, '');
+        
+        const newSocket = io(socketUrl, {
             transports: ['websocket', 'polling'],
-            reconnectionAttempts: 5,
+            reconnectionAttempts: 3,
             reconnectionDelay: 1000,
         });
         setSocket(newSocket);

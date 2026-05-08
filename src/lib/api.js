@@ -1,8 +1,21 @@
 import axios from 'axios';
 
-// export const API_BASE_URL = 'http://localhost:5000/api';
-export const API_BASE_URL = 'https://cashmish-backend.onrender.com/api';
-//export const API_BASE_URL = 'http://192.168.1.11:5000/api';
+// Priority List
+const BACKEND_URLS = [
+  'http://192.168.1.11:5000',
+  'https://cashmish-backend.onrender.com'
+];
+
+export const getActiveURL = () => {
+  if (typeof window === 'undefined') return BACKEND_URLS[0];
+  const saved = sessionStorage.getItem('activeBackendURL');
+  if (saved && BACKEND_URLS.includes(saved)) {
+      return saved;
+  }
+  return BACKEND_URLS[0];
+};
+
+export const API_BASE_URL = `${getActiveURL()}/api`;
 
 const api = axios.create({
   baseURL: API_BASE_URL,
@@ -10,22 +23,46 @@ const api = axios.create({
     'Content-Type': 'application/json',
     'ngrok-skip-browser-warning': 'true',
   },
+  timeout: 8000, // 8s timeout to trigger failover
 });
 
-// Add interceptor to attach token
+// Helper to switch URL
+const switchToFallback = () => {
+    const current = getActiveURL();
+    const currentIndex = BACKEND_URLS.indexOf(current);
+    const nextIndex = (currentIndex + 1) % BACKEND_URLS.length;
+    const nextURL = BACKEND_URLS[nextIndex];
+    sessionStorage.setItem('activeBackendURL', nextURL);
+    return nextURL;
+};
+
+// Add interceptor to attach token and handle dynamic baseURL
 api.interceptors.request.use((config) => {
+  const currentBase = getActiveURL();
+  config.baseURL = `${currentBase}/api`;
+  
   const token = localStorage.getItem('token');
-  // console.log('Interceptor Token:', token); // Removed debug log
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
   return config;
 });
 
-// Add interceptor to handle 401 (Unauthorized) responses
+// Add interceptor to handle 401 (Unauthorized) responses and Failover
 api.interceptors.response.use(
   (response) => response,
-  (error) => {
+  async (error) => {
+    const originalRequest = error.config;
+
+    // Handle Network Errors or Timeouts for Failover
+    if ((error.code === 'ERR_NETWORK' || error.code === 'ECONNABORTED') && !originalRequest._retry) {
+        originalRequest._retry = true;
+        const nextURL = switchToFallback();
+        console.warn(`Backend unreachable. Switching to: ${nextURL}`);
+        originalRequest.baseURL = `${nextURL}/api`;
+        return api(originalRequest);
+    }
+
     if (error.response && error.response.status === 401) {
       // Token expired or invalid
       localStorage.removeItem('token');
@@ -35,6 +72,23 @@ api.interceptors.response.use(
     return Promise.reject(error);
   }
 );
+
+// Fetch Wrapper for native fetch calls
+export const fetchWithFallback = async (url, options = {}) => {
+    const currentBase = getActiveURL();
+    const fullUrl = url.startsWith('http') ? url : `${currentBase}${url}`;
+    
+    try {
+        const response = await fetch(fullUrl, options);
+        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+        return response;
+    } catch (error) {
+        console.warn(`Fetch failed at ${fullUrl}. Attempting fallback...`);
+        const nextURL = switchToFallback();
+        const fallbackUrl = url.startsWith('http') ? url.replace(currentBase, nextURL) : `${nextURL}${url}`;
+        return fetch(fallbackUrl, options);
+    }
+};
 
 // Mobile APIs
 export const mobileApi = {
