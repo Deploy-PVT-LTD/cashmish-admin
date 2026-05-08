@@ -4,10 +4,11 @@ import { io } from 'socket.io-client';
 import { format } from 'date-fns';
 import { Send, User as UserIcon, Loader2, MessageSquare, CheckCircle2, Trash2, Check, AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
-import { chatApi, getActiveURL } from '@/lib/api';
+import { chatApi, getActiveURL, switchToFallback } from '@/lib/api';
 
 export default function SupportChats() {
     const [socket, setSocket] = useState(null);
+    const [socketUrl, setSocketUrl] = useState(() => getActiveURL().replace(/\/api\/?$/, ''));
     const [sessions, setSessions] = useState([]);
     const [activeSession, setActiveSession] = useState(null);
     const [messages, setMessages] = useState([]);
@@ -18,14 +19,22 @@ export default function SupportChats() {
 
     // Initialize Socket.io connection with fallback-aware URL
     useEffect(() => {
-        const activeBase = getActiveURL();
-        const socketUrl = activeBase.replace(/\/api\/?$/, '');
-        
+        console.log(`Connecting to socket: ${socketUrl}`);
         const newSocket = io(socketUrl, {
             transports: ['websocket', 'polling'],
-            reconnectionAttempts: 3,
+            reconnectionAttempts: 2,
             reconnectionDelay: 1000,
         });
+
+        newSocket.on('connect_error', (err) => {
+            console.warn(`Socket connection error on ${socketUrl}:`, err.message);
+            // Switch URL and re-initialize if it's a connectivity issue
+            if (err.message === 'xhr poll error' || err.message === 'websocket error') {
+                const nextBase = switchToFallback();
+                setSocketUrl(nextBase.replace(/\/api\/?$/, ''));
+            }
+        });
+
         setSocket(newSocket);
 
         // Fetch initial active sessions
@@ -71,7 +80,7 @@ export default function SupportChats() {
         });
 
         return () => newSocket.disconnect();
-    }, []);
+    }, [socketUrl]);
 
     // Scroll to bottom when messages change
     useEffect(() => {

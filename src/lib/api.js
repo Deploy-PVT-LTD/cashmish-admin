@@ -27,7 +27,7 @@ const api = axios.create({
 });
 
 // Helper to switch URL
-const switchToFallback = () => {
+export const switchToFallback = () => {
     const current = getActiveURL();
     const currentIndex = BACKEND_URLS.indexOf(current);
     const nextIndex = (currentIndex + 1) % BACKEND_URLS.length;
