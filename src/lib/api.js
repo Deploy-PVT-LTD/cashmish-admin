@@ -2,15 +2,15 @@ import axios from 'axios';
 
 // Priority List
 const BACKEND_URLS = [
-  'http://192.168.1.11:5000',
-  'https://cashmish-backend.onrender.com'
+  'https://cashmish-backend.onrender.com',
+  'http://192.168.1.11:5000'
 ];
 
 export const getActiveURL = () => {
   if (typeof window === 'undefined') return BACKEND_URLS[0];
   const saved = sessionStorage.getItem('activeBackendURL');
   if (saved && BACKEND_URLS.includes(saved)) {
-      return saved;
+    return saved;
   }
   return BACKEND_URLS[0];
 };
@@ -28,19 +28,19 @@ const api = axios.create({
 
 // Helper to switch URL
 export const switchToFallback = () => {
-    const current = getActiveURL();
-    const currentIndex = BACKEND_URLS.indexOf(current);
-    const nextIndex = (currentIndex + 1) % BACKEND_URLS.length;
-    const nextURL = BACKEND_URLS[nextIndex];
-    sessionStorage.setItem('activeBackendURL', nextURL);
-    return nextURL;
+  const current = getActiveURL();
+  const currentIndex = BACKEND_URLS.indexOf(current);
+  const nextIndex = (currentIndex + 1) % BACKEND_URLS.length;
+  const nextURL = BACKEND_URLS[nextIndex];
+  sessionStorage.setItem('activeBackendURL', nextURL);
+  return nextURL;
 };
 
 // Add interceptor to attach token and handle dynamic baseURL
 api.interceptors.request.use((config) => {
   const currentBase = getActiveURL();
   config.baseURL = `${currentBase}/api`;
-  
+
   const token = localStorage.getItem('token');
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
@@ -56,11 +56,11 @@ api.interceptors.response.use(
 
     // Handle Network Errors or Timeouts for Failover
     if ((error.code === 'ERR_NETWORK' || error.code === 'ECONNABORTED') && !originalRequest._retry) {
-        originalRequest._retry = true;
-        const nextURL = switchToFallback();
-        console.warn(`Backend unreachable. Switching to: ${nextURL}`);
-        originalRequest.baseURL = `${nextURL}/api`;
-        return api(originalRequest);
+      originalRequest._retry = true;
+      const nextURL = switchToFallback();
+      console.warn(`Backend unreachable. Switching to: ${nextURL}`);
+      originalRequest.baseURL = `${nextURL}/api`;
+      return api(originalRequest);
     }
 
     if (error.response && error.response.status === 401) {
@@ -75,19 +75,19 @@ api.interceptors.response.use(
 
 // Fetch Wrapper for native fetch calls
 export const fetchWithFallback = async (url, options = {}) => {
-    const currentBase = getActiveURL();
-    const fullUrl = url.startsWith('http') ? url : `${currentBase}${url}`;
-    
-    try {
-        const response = await fetch(fullUrl, options);
-        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-        return response;
-    } catch (error) {
-        console.warn(`Fetch failed at ${fullUrl}. Attempting fallback...`);
-        const nextURL = switchToFallback();
-        const fallbackUrl = url.startsWith('http') ? url.replace(currentBase, nextURL) : `${nextURL}${url}`;
-        return fetch(fallbackUrl, options);
-    }
+  const currentBase = getActiveURL();
+  const fullUrl = url.startsWith('http') ? url : `${currentBase}${url}`;
+
+  try {
+    const response = await fetch(fullUrl, options);
+    if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+    return response;
+  } catch (error) {
+    console.warn(`Fetch failed at ${fullUrl}. Attempting fallback...`);
+    const nextURL = switchToFallback();
+    const fallbackUrl = url.startsWith('http') ? url.replace(currentBase, nextURL) : `${nextURL}${url}`;
+    return fetch(fallbackUrl, options);
+  }
 };
 
 // Mobile APIs
