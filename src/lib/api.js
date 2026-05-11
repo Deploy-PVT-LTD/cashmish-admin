@@ -2,8 +2,8 @@ import axios from 'axios';
 
 // Priority List
 const BACKEND_URLS = [
-  'https://cashmish-backend.onrender.com',
-  'http://localhost:5000'
+  'https://cashmish-backend.onrender.com'
+
 ];
 
 export const getActiveURL = () => {
