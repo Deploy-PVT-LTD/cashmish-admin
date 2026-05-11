@@ -3,7 +3,7 @@ import axios from 'axios';
 // Priority List
 const BACKEND_URLS = [
   'https://cashmish-backend.onrender.com',
-  'https://backend.cashmish.com:5000'
+  'http://localhost:5000'
 ];
 
 export const getActiveURL = () => {
@@ -22,6 +22,7 @@ const api = axios.create({
   headers: {
     'Content-Type': 'application/json',
     'ngrok-skip-browser-warning': 'true',
+    'X-Admin-Request': 'true',
   },
   timeout: 8000, // 8s timeout to trigger failover
 });
@@ -331,6 +332,18 @@ export const chatApi = {
   // Delete chat session
   deleteSession: async (sessionId) => {
     const response = await api.delete(`/chat/${sessionId}`);
+    return response.data;
+  }
+};
+
+// Traffic API
+export const trafficApi = {
+  getStats: async () => {
+    const response = await api.get('/traffic/stats');
+    return response.data;
+  },
+  getHistory: async () => {
+    const response = await api.get('/traffic/history');
     return response.data;
   }
 };

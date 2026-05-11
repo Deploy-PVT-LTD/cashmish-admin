@@ -22,6 +22,7 @@ import Reviews from './pages/Reviews';
 import Blogs from './pages/Blogs';
 import SupportChats from './pages/SupportChats';
 import Login from "./pages/Login";
+import Traffic from "./pages/Traffic";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -56,6 +57,7 @@ const App = () => (
             <Route path="/users" element={<ProtectedRoute allowedRoles={['superadmin']}><Users /></ProtectedRoute>} />
             <Route path="/requests" element={<ProtectedRoute allowedRoles={['superadmin']}><Requests /></ProtectedRoute>} />
             <Route path="/analytics" element={<ProtectedRoute allowedRoles={['superadmin']}><Analytics /></ProtectedRoute>} />
+            <Route path="/traffic" element={<ProtectedRoute allowedRoles={['superadmin', 'admin']}><Traffic /></ProtectedRoute>} />
 
             {/* Catch-all */}
             <Route path="*" element={<NotFound />} />

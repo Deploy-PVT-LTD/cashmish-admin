@@ -20,6 +20,7 @@ import {
   MessageSquare,
   X,
   Ticket, // Added Ticket icon
+  Globe,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -38,7 +39,8 @@ const navItems = [
   { icon: MessageSquare, label: 'Reviews', path: '/reviews', allowedRoles: ['superadmin', 'admin'] },
   { icon: FileText, label: 'Blogs', path: '/blogs', allowedRoles: ['superadmin', 'admin'] },
   { icon: Users, label: 'Users', path: '/users', allowedRoles: ['superadmin'] },
-  // { icon: BarChart3, label: 'Analytics', path: '/analytics' },
+  { icon: BarChart3, label: 'Analytics', path: '/analytics', allowedRoles: ['superadmin'] },
+  { icon: Globe, label: 'Traffic', path: '/traffic', allowedRoles: ['superadmin', 'admin'] },
   { icon: MessageSquare, label: 'Support Chats', path: '/support-chats', allowedRoles: ['superadmin', 'admin'] },
   { icon: Settings, label: 'Settings', path: '/settings', allowedRoles: ['superadmin', 'admin', 'accountant'] },
 ];

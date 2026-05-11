@@ -15,7 +15,9 @@ import {
   DollarSign,
   Users,
   Banknote,
+  Globe,
 } from 'lucide-react';
+import { trafficApi } from '@/lib/api';
 
 export default function Dashboard() {
   const [stats, setStats] = useState({
@@ -29,6 +31,7 @@ export default function Dashboard() {
     brandData: [],
     conditionData: [],
     recentSubmissions: [],
+    totalVisitors: 0,
   });
   const [loading, setLoading] = useState(true);
 
@@ -52,7 +55,21 @@ export default function Dashboard() {
             brandData: data.brandData || [],
             conditionData: data.conditionData || [],
             recentSubmissions: data.recentSubmissions || [],
+            totalVisitors: data.totalVisitors || 0,
           });
+        }
+
+        // Fetch traffic stats separately if not in dashboard stats
+        try {
+          const trafficData = await trafficApi.getStats();
+          if (trafficData.success) {
+            setStats(prev => ({
+              ...prev,
+              totalVisitors: trafficData.data.totalVisitors
+            }));
+          }
+        } catch (e) {
+          console.error('Traffic stats error:', e);
         }
       } catch (error) {
         console.error('Error fetching dashboard data:', error);
@@ -133,6 +150,13 @@ export default function Dashboard() {
           icon={Banknote}
           iconBgColor="bg-accent/5"
           iconColor="text-accent-foreground"
+        />
+        <StatCard
+          title="Total Traffic"
+          value={stats.totalVisitors.toLocaleString()}
+          icon={Globe}
+          iconBgColor="bg-primary/10"
+          iconColor="text-primary"
         />
       </div>
 
