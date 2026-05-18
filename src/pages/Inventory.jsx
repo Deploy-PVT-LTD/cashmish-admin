@@ -86,6 +86,7 @@ function InventoryForm({ formData, setFormData, onSubmit, isEdit, submitting }) 
               <SelectItem value="256GB">256GB</SelectItem>
               <SelectItem value="512GB">512GB</SelectItem>
               <SelectItem value="1TB">1TB</SelectItem>
+              <SelectItem value="2TB">2TB</SelectItem>
             </SelectContent>
           </Select>
         </div>
