@@ -88,18 +88,30 @@ function MobileForm({ formData, setFormData, onSubmit, isEdit, submitting }) {
           onChange={(e) => setFormData(prev => ({ ...prev, phoneModel: e.target.value }))}
         />
       </div>
-      <div className="space-y-2">
-        <Label>Base Price ($)</Label>
-        <Input
-          type="number"
-          min="0"
-          placeholder="e.g., 799"
-          value={formData.basePrice}
-          onChange={(e) => setFormData(prev => ({ ...prev, basePrice: e.target.value }))}
-        />
-        {formData.basePrice && Number(formData.basePrice) < 1 && (
-          <p className="text-xs text-destructive">Price must be at least $1</p>
-        )}
+      <div className="grid grid-cols-2 gap-4">
+        <div className="space-y-2">
+          <Label>Base Price (Unlocked) ($)</Label>
+          <Input
+            type="number"
+            min="0"
+            placeholder="e.g., 799"
+            value={formData.basePrice}
+            onChange={(e) => setFormData(prev => ({ ...prev, basePrice: e.target.value }))}
+          />
+          {formData.basePrice && Number(formData.basePrice) < 1 && (
+            <p className="text-xs text-destructive">Price must be at least $1</p>
+          )}
+        </div>
+        <div className="space-y-2">
+          <Label>Base Price (Locked) ($)</Label>
+          <Input
+            type="number"
+            min="0"
+            placeholder="e.g., 699"
+            value={formData.basePriceLocked !== undefined ? formData.basePriceLocked : ''}
+            onChange={(e) => setFormData(prev => ({ ...prev, basePriceLocked: e.target.value }))}
+          />
+        </div>
       </div>
       <div className="space-y-2">
         <Label>Image URL</Label>
@@ -216,6 +228,7 @@ export default function Mobiles() {
     brand: '',
     phoneModel: '',
     basePrice: '',
+    basePriceLocked: '',
     image: '',
     deductionRules: {
       screen: { perfect: 0, scratched: 10, cracked: 25 },
@@ -268,6 +281,7 @@ export default function Mobiles() {
         brand: formData.brand,
         phoneModel: formData.phoneModel,
         basePrice: parseInt(formData.basePrice),
+        basePriceLocked: parseInt(formData.basePriceLocked) || 0,
         image: formData.image || undefined,
         deductionRules: formData.deductionRules
       };
@@ -296,6 +310,7 @@ export default function Mobiles() {
         brand: formData.brand,
         phoneModel: formData.phoneModel,
         basePrice: parseInt(formData.basePrice),
+        basePriceLocked: parseInt(formData.basePriceLocked) || 0,
         image: formData.image || undefined,
         deductionRules: formData.deductionRules
       };
@@ -363,6 +378,7 @@ export default function Mobiles() {
       brand: mobile.brand,
       phoneModel: mobile.phoneModel,
       basePrice: mobile.basePrice.toString(),
+      basePriceLocked: mobile.basePriceLocked ? mobile.basePriceLocked.toString() : '0',
       image: mobile.image || '',
       deductionRules: mobile.deductionRules || {
         screen: { perfect: 0, scratched: 10, cracked: 25 },
@@ -374,7 +390,7 @@ export default function Mobiles() {
 
   const openAddModal = () => {
     setFormData({
-      brand: '', phoneModel: '', basePrice: '', image: '',
+      brand: '', phoneModel: '', basePrice: '', basePriceLocked: '', image: '',
       deductionRules: {
         screen: { perfect: 0, scratched: 10, cracked: 25 },
         body: { perfect: 0, scratched: 10, damaged: 20 },
@@ -478,10 +494,13 @@ export default function Mobiles() {
                   </span>
                 </div>
                 <div className="flex items-center justify-between mt-3">
-                  <span className="text-lg font-bold text-foreground">
-                    ${mobile.basePrice?.toLocaleString()}
+                  <span className="text-lg font-bold text-foreground flex flex-col">
+                    <span>${mobile.basePrice?.toLocaleString()} <span className="text-xs text-muted-foreground font-normal">(U)</span></span>
+                    {mobile.basePriceLocked !== undefined && (
+                      <span className="text-sm opacity-80">${mobile.basePriceLocked?.toLocaleString()} <span className="text-xs text-muted-foreground font-normal">(L)</span></span>
+                    )}
                     {mobile.deductionRules && (
-                      <span className="ml-2 px-2 py-0.5 text-[10px] bg-primary/10 text-primary rounded-full border border-primary/20 align-middle">
+                      <span className="mt-1 px-2 py-0.5 text-[10px] w-max bg-primary/10 text-primary rounded-full border border-primary/20 align-middle">
                         Rules
                       </span>
                     )}
@@ -560,12 +579,17 @@ export default function Mobiles() {
                       <td className="px-6 py-4 text-sm font-medium text-foreground">{mobile.brand}</td>
                       <td className="px-6 py-4 text-sm text-foreground">{mobile.phoneModel}</td>
                       <td className="px-6 py-4 text-sm font-medium text-foreground">
-                        ${mobile.basePrice?.toLocaleString()}
-                        {mobile.deductionRules && (
-                          <span className="ml-2 px-2 py-0.5 text-[10px] bg-primary/10 text-primary rounded-full border border-primary/20">
-                            Custom Rules
-                          </span>
-                        )}
+                        <div className="flex flex-col">
+                          <span>${mobile.basePrice?.toLocaleString()} <span className="text-xs text-muted-foreground font-normal ml-1">Unl.</span></span>
+                          {mobile.basePriceLocked !== undefined && (
+                            <span className="text-xs opacity-70 mt-1">${mobile.basePriceLocked?.toLocaleString()} <span className="text-[10px] text-muted-foreground font-normal">Lck.</span></span>
+                          )}
+                          {mobile.deductionRules && (
+                            <span className="mt-2 w-max px-2 py-0.5 text-[10px] bg-primary/10 text-primary rounded-full border border-primary/20">
+                              Custom Rules
+                            </span>
+                          )}
+                        </div>
                       </td>
                       <td className="px-6 py-4">
                         <span className={mobile.isActive ? 'badge-active' : 'badge-inactive'}>
