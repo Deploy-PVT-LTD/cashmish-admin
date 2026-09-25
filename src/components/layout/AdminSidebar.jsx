@@ -4,6 +4,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import {
   LayoutDashboard,
   Smartphone,
+  LayoutGrid,
   Settings2,
   FileText,
   Gavel,
@@ -27,6 +28,7 @@ import { toast } from 'sonner';
 
 const navItems = [
   { icon: LayoutDashboard, label: 'Dashboard', path: '/', allowedRoles: ['superadmin', 'admin', 'accountant'] },
+  { icon: LayoutGrid, label: 'Categories', path: '/categories', allowedRoles: ['superadmin', 'admin'] },
   { icon: Smartphone, label: 'Mobiles', path: '/mobiles', allowedRoles: ['superadmin', 'admin'] },
   { icon: RefreshCw, label: 'Requests', path: '/requests', allowedRoles: ['superadmin'] },
   // { icon: Settings2, label: 'Price Config', path: '/price-configuration', allowedRoles: ['superadmin', 'admin'] },

@@ -32,53 +32,84 @@ import {
 } from '@/components/ui/select';
 import { Plus, Pencil, Power, Search, Loader2, Trash2, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
-import { mobileApi } from '@/lib/api';
+import { mobileApi, categoryApi } from '@/lib/api';
 import { cn } from '@/lib/utils';
 
-// Form component moved OUTSIDE to prevent re-renders
-function MobileForm({ formData, setFormData, onSubmit, isEdit, submitting }) {
-  const handleRuleChange = (category, condition, value) => {
-    // Allow empty string to let user clear input
-    if (value === '') {
-      setFormData(prev => ({
-        ...prev,
-        deductionRules: {
-          ...prev.deductionRules,
-          [category]: {
-            ...prev.deductionRules?.[category],
-            [condition]: ''
-          }
-        }
-      }));
-      return;
-    }
+// Letter grade system — A = best condition, F = worst. Matches
+// cashmish-backend/utils/priceCalculator.js GRADES exactly.
+const GRADES = ['A', 'B', 'C', 'D', 'E', 'F'];
 
-    const numValue = Math.min(100, Math.max(0, Number(value)));
-    setFormData(prev => ({
-      ...prev,
-      deductionRules: {
-        ...prev.deductionRules,
-        [category]: {
-          ...prev.deductionRules?.[category],
-          [condition]: numValue
-        }
+// Builds an empty gradePricing bucket for one storage key (or 'default').
+const emptyGradeBucket = () => ({
+  unlockedBase: '',
+  lockedBase: '',
+  unlocked: Object.fromEntries(GRADES.map((g) => [g, ''])),
+  locked: Object.fromEntries(GRADES.map((g) => [g, ''])),
+});
+
+// True if this product has at least one storage bucket with a real (numeric)
+// Grade A unlocked price set — used to show a "Grade Priced" badge in the list.
+const hasGradePricing = (mobile) => {
+  const gp = mobile?.gradePricing;
+  if (!gp || typeof gp !== 'object') return false;
+  return Object.values(gp).some((bucket) => typeof bucket?.unlocked?.A === 'number');
+};
+
+// Form component moved OUTSIDE to prevent re-renders
+function MobileForm({ formData, setFormData, onSubmit, isEdit, submitting, categories }) {
+  const handleGradeChange = (storageKey, field, grade, value) => {
+    const numValue = value === '' ? '' : Number(value);
+    setFormData(prev => {
+      const gradePricing = { ...(prev.gradePricing || {}) };
+      const bucket = { ...(gradePricing[storageKey] || emptyGradeBucket()) };
+      if (grade === null) {
+        bucket[field] = numValue; // unlockedBase / lockedBase
+      } else {
+        bucket[field] = { ...(bucket[field] || {}), [grade]: numValue };
       }
-    }));
+      gradePricing[storageKey] = bucket;
+      return { ...prev, gradePricing };
+    });
   };
 
   return (
     <div className="space-y-4 mt-4 h-[60vh] overflow-y-auto pr-2">
       <div className="space-y-2">
-        <Label>Brand</Label>
-        <Select value={formData.brand} onValueChange={(value) => setFormData(prev => ({ ...prev, brand: value }))}>
+        <Label>Category</Label>
+        <Select
+          value={formData.category}
+          onValueChange={(value) => {
+            // Reset deduction rules to the newly selected category's own defaults —
+            // the old category's questions/keys no longer apply.
+            const cat = categories.find(c => c.slug === value);
+            const rules = {};
+            (cat?.assessmentQuestions || []).forEach((q) => {
+              rules[q.key] = {};
+              q.options.forEach((opt) => { rules[q.key][opt.key] = opt.deduction ?? 0; });
+            });
+            // Grade pricing is keyed by this category's own storage options (or
+            // 'default' if it has no storage step) — start fresh for the new category.
+            setFormData(prev => ({ ...prev, category: value, deductionRules: rules, gradePricing: {} }));
+          }}
+        >
           <SelectTrigger className="bg-background">
-            <SelectValue placeholder="Select brand" />
+            <SelectValue placeholder="Select category" />
           </SelectTrigger>
           <SelectContent className="bg-card border-border z-50">
-            <SelectItem value="Apple">Apple</SelectItem>
-            <SelectItem value="Samsung">Samsung</SelectItem>
+            {categories.map((cat) => (
+              <SelectItem key={cat._id} value={cat.slug}>{cat.name}</SelectItem>
+            ))}
           </SelectContent>
         </Select>
+        <p className="text-xs text-muted-foreground">Don't see the category you need? Add it from the Categories page first.</p>
+      </div>
+      <div className="space-y-2">
+        <Label>Brand</Label>
+        <Input
+          placeholder="e.g., Apple, Xbox, Dell..."
+          value={formData.brand}
+          onChange={(e) => setFormData(prev => ({ ...prev, brand: e.target.value }))}
+        />
       </div>
       <div className="space-y-2">
         <Label>Model Name</Label>
@@ -123,62 +154,65 @@ function MobileForm({ formData, setFormData, onSubmit, isEdit, submitting }) {
       </div>
 
       <div className="border-t pt-4 mt-4">
-        <Label className="text-base font-semibold">Deduction Rules (%)</Label>
-        <p className="text-xs text-muted-foreground mb-4">Override global rules for this mobile.</p>
+        <Label className="text-base font-semibold">Grade Pricing ($)</Label>
+        <p className="text-xs text-muted-foreground mb-4">
+          Exact payout per condition grade — A (best) through F (worst). Whatever grade the
+          customer's answers work out to, this is exactly what they're quoted; no percentage
+          math involved. "Base" is just a reference price, not used in the quote itself.
+        </p>
 
-        {/* Screen */}
-        <div className="space-y-3 mb-4">
-          <Label className="text-sm font-medium text-primary">Screen</Label>
-          <div className="grid grid-cols-3 gap-2">
-            {['perfect', 'scratched', 'cracked'].map(cond => (
-              <div key={cond}>
-                <Label className="text-xs capitalize">{cond}</Label>
-                <Input
-                  type="number"
-                  className="h-8"
-                  value={formData.deductionRules?.screen?.[cond] ?? ''}
-                  onChange={(e) => handleRuleChange('screen', cond, e.target.value)}
-                />
-              </div>
-            ))}
-          </div>
-        </div>
+        {(() => {
+          const selectedCategory = categories.find(c => c.slug === formData.category);
+          const hasStorage = Boolean(selectedCategory?.hasStorageStep && selectedCategory?.storageOptions?.length);
+          const storageKeys = hasStorage ? selectedCategory.storageOptions : ['default'];
 
-        {/* Body */}
-        <div className="space-y-3 mb-4">
-          <Label className="text-sm font-medium text-primary">Body</Label>
-          <div className="grid grid-cols-3 gap-2">
-            {['perfect', 'scratched', 'damaged'].map(cond => (
-              <div key={cond}>
-                <Label className="text-xs capitalize">{cond}</Label>
-                <Input
-                  type="number"
-                  className="h-8"
-                  value={formData.deductionRules?.body?.[cond] ?? ''}
-                  onChange={(e) => handleRuleChange('body', cond, e.target.value)}
-                />
-              </div>
-            ))}
-          </div>
-        </div>
+          return storageKeys.map((storageKey) => {
+            const bucket = formData.gradePricing?.[storageKey] || {};
+            return (
+              <div key={storageKey} className="mb-4 border border-border rounded-lg p-3">
+                <Label className="text-sm font-medium text-primary mb-2 block">
+                  {hasStorage ? storageKey : 'Pricing'}
+                </Label>
 
-        {/* Battery */}
-        <div className="space-y-3 mb-4">
-          <Label className="text-sm font-medium text-primary">Battery</Label>
-          <div className="grid grid-cols-3 gap-2">
-            {['good', 'average', 'poor'].map(cond => (
-              <div key={cond}>
-                <Label className="text-xs capitalize">{cond}</Label>
-                <Input
-                  type="number"
-                  className="h-8"
-                  value={formData.deductionRules?.battery?.[cond] ?? ''}
-                  onChange={(e) => handleRuleChange('battery', cond, e.target.value)}
-                />
+                <div className="grid grid-cols-3 gap-2 text-[10px] text-muted-foreground uppercase tracking-wide mb-1 px-0.5">
+                  <span>Grade</span>
+                  <span>Unlocked $</span>
+                  <span>Locked $</span>
+                </div>
+
+                <div className="grid grid-cols-3 gap-2 items-center mb-2">
+                  <span className="text-xs font-semibold text-muted-foreground">Base (ref.)</span>
+                  <Input
+                    type="number" className="h-8" placeholder="e.g. 755"
+                    value={bucket.unlockedBase ?? ''}
+                    onChange={(e) => handleGradeChange(storageKey, 'unlockedBase', null, e.target.value)}
+                  />
+                  <Input
+                    type="number" className="h-8" placeholder="e.g. 671"
+                    value={bucket.lockedBase ?? ''}
+                    onChange={(e) => handleGradeChange(storageKey, 'lockedBase', null, e.target.value)}
+                  />
+                </div>
+
+                {GRADES.map((g) => (
+                  <div key={g} className="grid grid-cols-3 gap-2 items-center mb-1.5">
+                    <span className="text-xs font-semibold">{g}</span>
+                    <Input
+                      type="number" className="h-8"
+                      value={bucket.unlocked?.[g] ?? ''}
+                      onChange={(e) => handleGradeChange(storageKey, 'unlocked', g, e.target.value)}
+                    />
+                    <Input
+                      type="number" className="h-8"
+                      value={bucket.locked?.[g] ?? ''}
+                      onChange={(e) => handleGradeChange(storageKey, 'locked', g, e.target.value)}
+                    />
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
-        </div>
+            );
+          });
+        })()}
       </div>
 
       <Button
@@ -213,6 +247,8 @@ export default function Mobiles() {
   const [searchTerm, setSearchTerm] = useState('');
   const debouncedSearch = useDebounce(searchTerm, 500);
   const [brandFilter, setBrandFilter] = useState('all');
+  const [categoryFilter, setCategoryFilter] = useState('all');
+  const [categories, setCategories] = useState([]);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [editingMobile, setEditingMobile] = useState(null);
   const [submitting, setSubmitting] = useState(false);
@@ -225,17 +261,37 @@ export default function Mobiles() {
   const [totalItems, setTotalItems] = useState(0);
   const ITEMS_PER_PAGE = 10;
   const [formData, setFormData] = useState({
+    category: 'mobile-phones',
     brand: '',
     phoneModel: '',
     basePrice: '',
     basePriceLocked: '',
     image: '',
-    deductionRules: {
-      screen: { perfect: 0, scratched: 10, cracked: 25 },
-      body: { perfect: 0, scratched: 10, damaged: 20 },
-      battery: { good: 0, average: 10, poor: 20 }
-    }
+    deductionRules: {},
+    gradePricing: {}
   });
+
+  // Builds a fresh deductionRules object from a category's own default % per option
+  // (set on the Categories page) — this is what a brand-new product starts with.
+  const buildDefaultDeductionRules = (categorySlug) => {
+    const cat = categories.find(c => c.slug === categorySlug);
+    const questions = cat?.assessmentQuestions || [];
+    const rules = {};
+    questions.forEach((q) => {
+      rules[q.key] = {};
+      q.options.forEach((opt) => {
+        rules[q.key][opt.key] = opt.deduction ?? 0;
+      });
+    });
+    return rules;
+  };
+
+  // Fetch categories for the dropdown (admin view — includes inactive so existing items still show their category)
+  useEffect(() => {
+    categoryApi.getAllAdmin()
+      .then(setCategories)
+      .catch((err) => console.error('Error fetching categories:', err));
+  }, []);
 
   // Fetch mobiles from API
   // Fetch mobiles from API
@@ -247,7 +303,8 @@ export default function Mobiles() {
         page,
         limit: ITEMS_PER_PAGE,
         search: debouncedSearch,
-        brand: brandFilter
+        brand: brandFilter,
+        category: categoryFilter
       });
 
       if (data.pagination) {
@@ -270,20 +327,24 @@ export default function Mobiles() {
 
   useEffect(() => {
     fetchMobiles();
-  }, [page, debouncedSearch, brandFilter]);
+  }, [page, debouncedSearch, brandFilter, categoryFilter]);
 
   const filteredMobiles = mobiles;
+
+  const getCategoryName = (slug) => categories.find(c => c.slug === slug)?.name || slug || 'Mobile Phones';
 
   const handleAddMobile = async () => {
     try {
       setSubmitting(true);
       const newMobile = {
+        category: formData.category,
         brand: formData.brand,
         phoneModel: formData.phoneModel,
         basePrice: parseInt(formData.basePrice),
         basePriceLocked: parseInt(formData.basePriceLocked) || 0,
         image: formData.image || undefined,
-        deductionRules: formData.deductionRules
+        deductionRules: formData.deductionRules,
+        gradePricing: formData.gradePricing
       };
       const response = await mobileApi.create(newMobile);
       if (response.message && response.message.includes('approval')) {
@@ -307,12 +368,14 @@ export default function Mobiles() {
     try {
       setSubmitting(true);
       const updatedData = {
+        category: formData.category,
         brand: formData.brand,
         phoneModel: formData.phoneModel,
         basePrice: parseInt(formData.basePrice),
         basePriceLocked: parseInt(formData.basePriceLocked) || 0,
         image: formData.image || undefined,
-        deductionRules: formData.deductionRules
+        deductionRules: formData.deductionRules,
+        gradePricing: formData.gradePricing
       };
       const response = await mobileApi.update(editingMobile._id, updatedData);
       if (response.message && response.message.includes('approval')) {
@@ -374,28 +437,28 @@ export default function Mobiles() {
 
   const openEditModal = (mobile) => {
     setEditingMobile(mobile);
+    const category = mobile.category || 'mobile-phones';
     setFormData({
+      category,
       brand: mobile.brand,
       phoneModel: mobile.phoneModel,
       basePrice: mobile.basePrice.toString(),
       basePriceLocked: mobile.basePriceLocked ? mobile.basePriceLocked.toString() : '0',
       image: mobile.image || '',
-      deductionRules: mobile.deductionRules || {
-        screen: { perfect: 0, scratched: 10, cracked: 25 },
-        body: { perfect: 0, scratched: 10, damaged: 20 },
-        battery: { good: 0, average: 10, poor: 20 }
-      }
+      deductionRules: (mobile.deductionRules && Object.keys(mobile.deductionRules).length > 0)
+        ? mobile.deductionRules
+        : buildDefaultDeductionRules(category),
+      gradePricing: mobile.gradePricing || {}
     });
   };
 
   const openAddModal = () => {
+    const category = categoryFilter !== 'all' ? categoryFilter : (categories[0]?.slug || 'mobile-phones');
     setFormData({
+      category,
       brand: '', phoneModel: '', basePrice: '', basePriceLocked: '', image: '',
-      deductionRules: {
-        screen: { perfect: 0, scratched: 10, cracked: 25 },
-        body: { perfect: 0, scratched: 10, damaged: 20 },
-        battery: { good: 0, average: 10, poor: 20 }
-      }
+      deductionRules: buildDefaultDeductionRules(category),
+      gradePricing: {}
     });
     setIsAddModalOpen(true);
   };
@@ -419,17 +482,26 @@ export default function Mobiles() {
               className="pl-9"
             />
           </div>
+          <Select value={categoryFilter} onValueChange={(val) => { setCategoryFilter(val); setPage(1); }}>
+            <SelectTrigger className="w-full sm:w-44 bg-card">
+              <SelectValue placeholder="Category" />
+            </SelectTrigger>
+            <SelectContent className="bg-card border-border z-50">
+              <SelectItem value="all">All Categories</SelectItem>
+              {categories.map((cat) => (
+                <SelectItem key={cat._id} value={cat.slug}>{cat.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
           <Select value={brandFilter} onValueChange={(val) => { setBrandFilter(val); setPage(1); }}>
             <SelectTrigger className="w-full sm:w-40 bg-card">
               <SelectValue placeholder="Brand" />
             </SelectTrigger>
             <SelectContent className="bg-card border-border z-50">
               <SelectItem value="all">All Brands</SelectItem>
-              <SelectItem value="Apple">Apple</SelectItem>
-              <SelectItem value="Samsung">Samsung</SelectItem>
-              <SelectItem value="Google">Google</SelectItem>
-              <SelectItem value="Xiaomi">Xiaomi</SelectItem>
-              <SelectItem value="OnePlus">OnePlus</SelectItem>
+              {[...new Set(mobiles.map(m => m.brand))].sort().map((brand) => (
+                <SelectItem key={brand} value={brand}>{brand}</SelectItem>
+              ))}
             </SelectContent>
           </Select>
         </div>
@@ -459,6 +531,7 @@ export default function Mobiles() {
                 onSubmit={handleAddMobile}
                 isEdit={false}
                 submitting={submitting}
+                categories={categories}
               />
             </DialogContent>
           </Dialog>
@@ -486,7 +559,7 @@ export default function Mobiles() {
               <div key={mobile._id} className="stat-card">
                 <div className="flex items-start justify-between mb-2">
                   <div className="min-w-0 flex-1">
-                    <p className="text-xs text-muted-foreground truncate">{mobile.brand}</p>
+                    <p className="text-xs text-muted-foreground truncate">{getCategoryName(mobile.category)} · {mobile.brand}</p>
                     <h4 className="font-semibold text-foreground truncate">{mobile.phoneModel}</h4>
                   </div>
                   <span className={mobile.isActive ? 'badge-active' : 'badge-inactive'}>
@@ -499,9 +572,9 @@ export default function Mobiles() {
                     {mobile.basePriceLocked !== undefined && (
                       <span className="text-sm opacity-80">${mobile.basePriceLocked?.toLocaleString()} <span className="text-xs text-muted-foreground font-normal">(L)</span></span>
                     )}
-                    {mobile.deductionRules && (
-                      <span className="mt-1 px-2 py-0.5 text-[10px] w-max bg-primary/10 text-primary rounded-full border border-primary/20 align-middle">
-                        Rules
+                    {hasGradePricing(mobile) && (
+                      <span className="mt-1 px-2 py-0.5 text-[10px] w-max bg-success/10 text-success rounded-full border border-success/20 align-middle">
+                        Grade Priced
                       </span>
                     )}
                   </span>
@@ -523,6 +596,7 @@ export default function Mobiles() {
                           onSubmit={handleEditMobile}
                           isEdit={true}
                           submitting={submitting}
+                          categories={categories}
                         />
                       </DialogContent>
                     </Dialog>
@@ -557,6 +631,7 @@ export default function Mobiles() {
                 <thead className="bg-muted/50">
                   <tr>
                     <th className="text-left text-xs font-medium text-muted-foreground uppercase tracking-wider px-6 py-4">Image</th>
+                    <th className="text-left text-xs font-medium text-muted-foreground uppercase tracking-wider px-6 py-4">Category</th>
                     <th className="text-left text-xs font-medium text-muted-foreground uppercase tracking-wider px-6 py-4">Brand</th>
                     <th className="text-left text-xs font-medium text-muted-foreground uppercase tracking-wider px-6 py-4">Model</th>
                     <th className="text-left text-xs font-medium text-muted-foreground uppercase tracking-wider px-6 py-4">Base Price</th>
@@ -576,6 +651,7 @@ export default function Mobiles() {
                           </div>
                         )}
                       </td>
+                      <td className="px-6 py-4 text-sm text-muted-foreground">{getCategoryName(mobile.category)}</td>
                       <td className="px-6 py-4 text-sm font-medium text-foreground">{mobile.brand}</td>
                       <td className="px-6 py-4 text-sm text-foreground">{mobile.phoneModel}</td>
                       <td className="px-6 py-4 text-sm font-medium text-foreground">
@@ -584,9 +660,9 @@ export default function Mobiles() {
                           {mobile.basePriceLocked !== undefined && (
                             <span className="text-xs opacity-70 mt-1">${mobile.basePriceLocked?.toLocaleString()} <span className="text-[10px] text-muted-foreground font-normal">Lck.</span></span>
                           )}
-                          {mobile.deductionRules && (
-                            <span className="mt-2 w-max px-2 py-0.5 text-[10px] bg-primary/10 text-primary rounded-full border border-primary/20">
-                              Custom Rules
+                          {hasGradePricing(mobile) && (
+                            <span className="mt-2 w-max px-2 py-0.5 text-[10px] bg-success/10 text-success rounded-full border border-success/20">
+                              Grade Priced
                             </span>
                           )}
                         </div>
@@ -614,6 +690,7 @@ export default function Mobiles() {
                               onSubmit={handleEditMobile}
                               isEdit={true}
                               submitting={submitting}
+                              categories={categories}
                             />
                           </DialogContent>
                         </Dialog>

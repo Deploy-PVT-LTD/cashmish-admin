@@ -7,6 +7,7 @@ import { AuthProvider } from "@/contexts/AuthContext";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import Index from "./pages/Index";
 import Mobiles from "./pages/Mobiles";
+import Categories from "./pages/Categories";
 import Requests from "./pages/Requests";
 import ConditionRules from "./pages/ConditionRules";
 import Submissions from "./pages/Submissions";
@@ -41,6 +42,7 @@ const App = () => (
             <Route path="/" element={<ProtectedRoute allowedRoles={['superadmin', 'admin', 'accountant']}><Index /></ProtectedRoute>} />
 
             {/* Admin & Super Admin */}
+            <Route path="/categories" element={<ProtectedRoute allowedRoles={['superadmin', 'admin']}><Categories /></ProtectedRoute>} />
             <Route path="/mobiles" element={<ProtectedRoute allowedRoles={['superadmin', 'admin']}><Mobiles /></ProtectedRoute>} />
             <Route path="/price-configuration" element={<ProtectedRoute allowedRoles={['superadmin', 'admin']}><PriceConfiguration /></ProtectedRoute>} />
             <Route path="/conditions" element={<ProtectedRoute allowedRoles={['superadmin', 'admin']}><ConditionRules /></ProtectedRoute>} />

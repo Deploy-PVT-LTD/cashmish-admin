@@ -233,6 +233,26 @@ export default function Submissions() {
     return labels[type]?.[value] || value;
   };
 
+  // A = best condition ... F = worst. Not shown to the customer — only here, to
+  // the admin — so bids/inspection can be judged against the exact grade the
+  // system priced the offer at.
+  const GRADE_COLORS = {
+    A: 'bg-emerald-100 text-emerald-700 border-emerald-200',
+    B: 'bg-green-100 text-green-700 border-green-200',
+    C: 'bg-yellow-100 text-yellow-700 border-yellow-200',
+    D: 'bg-orange-100 text-orange-700 border-orange-200',
+    E: 'bg-red-100 text-red-700 border-red-200',
+    F: 'bg-red-200 text-red-800 border-red-300',
+  };
+  const getGradeBadge = (grade) => {
+    if (!grade) return <span className="text-xs text-muted-foreground">—</span>;
+    return (
+      <span className={`inline-flex items-center justify-center w-7 h-7 rounded-full text-xs font-bold border ${GRADE_COLORS[grade] || 'bg-muted text-muted-foreground border-border'}`}>
+        {grade}
+      </span>
+    );
+  };
+
   // Check if bid is valid
   const isBidValid = bidPrice && parseFloat(bidPrice) > 0;
   const showBidError = bidPrice !== '' && parseFloat(bidPrice) <= 0;
@@ -308,6 +328,10 @@ export default function Submissions() {
                     <span className="text-muted-foreground">Storage:</span>
                     <span className="text-foreground">{submission.storage}</span>
                   </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-muted-foreground">Grade:</span>
+                    {getGradeBadge(submission.grade)}
+                  </div>
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Est. Price:</span>
                     <span className="text-foreground font-bold">${submission.estimatedPrice?.toLocaleString() || 'N/A'}</span>
@@ -360,7 +384,7 @@ export default function Submissions() {
                     <th className="text-left text-xs font-medium text-muted-foreground uppercase tracking-wider px-6 py-4">Customer</th>
                     <th className="text-left text-xs font-medium text-muted-foreground uppercase tracking-wider px-6 py-4">Phone</th>
                     <th className="text-left text-xs font-medium text-muted-foreground uppercase tracking-wider px-6 py-4">Storage</th>
-                    <th className="text-left text-xs font-medium text-muted-foreground uppercase tracking-wider px-6 py-4">Conditions</th>
+                    <th className="text-left text-xs font-medium text-muted-foreground uppercase tracking-wider px-6 py-4">Grade</th>
                     <th className="text-left text-xs font-medium text-muted-foreground uppercase tracking-wider px-6 py-4">Est. Price</th>
                     <th className="text-left text-xs font-medium text-muted-foreground uppercase tracking-wider px-6 py-4">Bid</th>
                     <th className="text-left text-xs font-medium text-muted-foreground uppercase tracking-wider px-6 py-4">Status</th>
@@ -386,10 +410,7 @@ export default function Submissions() {
                       </td>
                       <td className={`px-6 py-4 text-sm ${submission.isDeleted ? 'line-through' : ''} text-muted-foreground`}>{submission.storage}</td>
                       <td className="px-6 py-4">
-                        <div className={`text-xs space-y-1 ${submission.isDeleted ? 'line-through' : ''}`}>
-                          <p className="text-muted-foreground">Screen: <span className="text-foreground">{getConditionLabel('screenCondition', submission.screenCondition)}</span></p>
-                          <p className="text-muted-foreground">Body: <span className="text-foreground">{getConditionLabel('bodyCondition', submission.bodyCondition)}</span></p>
-                        </div>
+                        {getGradeBadge(submission.grade)}
                       </td>
                       <td className={`px-6 py-4 text-sm font-medium ${submission.isDeleted ? 'line-through text-muted-foreground' : 'text-foreground'}`}>${submission.estimatedPrice?.toLocaleString() || 'N/A'}</td>
                       <td className={`px-6 py-4 text-sm font-bold ${submission.isDeleted ? 'line-through text-muted-foreground' : 'text-info'}`}>{submission.bidPrice > 0 ? `$${submission.bidPrice.toLocaleString()}` : '-'}</td>
@@ -559,7 +580,10 @@ export default function Submissions() {
               {/* Price & Bid */}
               <div className="space-y-3">
                 <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 bg-primary/5 border border-primary/20 rounded-lg gap-2">
-                  <span className="text-foreground font-medium">Estimated Price</span>
+                  <div className="flex items-center gap-3">
+                    <span className="text-foreground font-medium">Estimated Price</span>
+                    {getGradeBadge(selectedSubmission.grade)}
+                  </div>
                   <span className="text-2xl font-bold text-primary">${selectedSubmission.estimatedPrice?.toLocaleString() || 'N/A'}</span>
                 </div>
                 {selectedSubmission.bidPrice > 0 && (

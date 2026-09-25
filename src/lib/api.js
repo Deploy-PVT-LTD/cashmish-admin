@@ -2,12 +2,16 @@ import axios from 'axios';
 
 // Priority List
 const BACKEND_URLS = [
+  ...(import.meta.env.DEV ? ['http://localhost:5000'] : []),
   'https://cashmish-backend.onrender.com'
-
 ];
 
 export const getActiveURL = () => {
   if (typeof window === 'undefined') return BACKEND_URLS[0];
+  // In dev, always prefer localhost fresh on each load — don't honor a stale
+  // fallback pin from a previous session where localhost happened to be down
+  // (e.g. mid-restart). Only real runtime failovers within THIS session apply.
+  if (import.meta.env.DEV) return BACKEND_URLS[0];
   const saved = sessionStorage.getItem('activeBackendURL');
   if (saved && BACKEND_URLS.includes(saved)) {
     return saved;
@@ -89,6 +93,36 @@ export const fetchWithFallback = async (url, options = {}) => {
     const fallbackUrl = url.startsWith('http') ? url.replace(currentBase, nextURL) : `${nextURL}${url}`;
     return fetch(fallbackUrl, options);
   }
+};
+
+// Category APIs
+export const categoryApi = {
+  // Public — active only
+  getAll: async () => {
+    const response = await api.get('/categories');
+    return response.data;
+  },
+
+  // Admin — all, including inactive
+  getAllAdmin: async () => {
+    const response = await api.get('/categories/all');
+    return response.data;
+  },
+
+  create: async (data) => {
+    const response = await api.post('/categories', data);
+    return response.data;
+  },
+
+  update: async (id, data) => {
+    const response = await api.put(`/categories/${id}`, data);
+    return response.data;
+  },
+
+  delete: async (id) => {
+    const response = await api.delete(`/categories/${id}`);
+    return response.data;
+  },
 };
 
 // Mobile APIs
