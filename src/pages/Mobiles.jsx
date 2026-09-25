@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Pagination } from '@/components/ui/Pagination';
 import { useAuth } from '@/contexts/AuthContext';
 import { useDebounce } from '@/hooks/useDebounce';
@@ -30,7 +30,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Plus, Pencil, Power, Search, Loader2, Trash2, RefreshCw } from 'lucide-react';
+import { Plus, Pencil, Power, Search, Loader2, Trash2, RefreshCw, FileSpreadsheet, CheckCircle2, AlertTriangle } from 'lucide-react';
 import { toast } from 'sonner';
 import { mobileApi, categoryApi } from '@/lib/api';
 import { cn } from '@/lib/utils';
@@ -255,6 +255,11 @@ export default function Mobiles() {
   const { user } = useAuth();
   const isSuperAdmin = user?.role === 'superadmin';
 
+  // Bulk grade-price import (Excel/CSV upload)
+  const [importing, setImporting] = useState(false);
+  const [importResult, setImportResult] = useState(null); // { message, updated, notMatched, skippedRows } | null
+  const fileInputRef = useRef(null);
+
   // Pagination State
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
@@ -332,6 +337,33 @@ export default function Mobiles() {
   const filteredMobiles = mobiles;
 
   const getCategoryName = (slug) => categories.find(c => c.slug === slug)?.name || slug || 'Mobile Phones';
+
+  // Bulk grade-price import — each row's first cell must read like
+  // "iPhone 17 Pro Max 256GB" (or the "i17 Pro Max" shorthand), followed by 14
+  // numeric columns: Unlocked Base, A-F, Locked Base, A-F. See
+  // cashmish-backend/controllers/mobileController.js#bulkImportGradePricing.
+  const handleImportFileSelected = async (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = ''; // allow re-selecting the same file next time
+    if (!file) return;
+
+    try {
+      setImporting(true);
+      const result = await mobileApi.bulkImportGrades(file);
+      setImportResult(result);
+      await fetchMobiles();
+      if (result.updated?.length > 0) {
+        toast.success(result.message);
+      } else {
+        toast.info(result.message || 'No matching products found in that file.');
+      }
+    } catch (error) {
+      console.error('Bulk import error:', error);
+      toast.error(error.response?.data?.message || 'Failed to import spreadsheet');
+    } finally {
+      setImporting(false);
+    }
+  };
 
   const handleAddMobile = async () => {
     try {
@@ -512,6 +544,26 @@ export default function Mobiles() {
           <Button variant="outline" onClick={fetchMobiles}>
             <RefreshCw className="w-4 h-4 mr-2" />
             Refresh
+          </Button>
+
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".xlsx,.xls,.csv"
+            className="hidden"
+            onChange={handleImportFileSelected}
+          />
+          <Button
+            variant="outline"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={importing}
+          >
+            {importing ? (
+              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+            ) : (
+              <FileSpreadsheet className="w-4 h-4 mr-2" />
+            )}
+            {importing ? 'Importing…' : 'Upload Excel'}
           </Button>
 
           <Dialog open={isAddModalOpen} onOpenChange={setIsAddModalOpen}>
@@ -773,6 +825,65 @@ export default function Mobiles() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Bulk Import Results */}
+      <Dialog open={!!importResult} onOpenChange={(open) => !open && setImportResult(null)}>
+        <DialogContent className="bg-card max-w-lg max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Import Results</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 mt-2">
+            <p className="text-sm text-muted-foreground">{importResult?.message}</p>
+
+            {importResult?.updated?.length > 0 && (
+              <div>
+                <Label className="text-sm font-semibold flex items-center gap-1.5 text-success">
+                  <CheckCircle2 className="w-4 h-4" /> Updated ({importResult.updated.length})
+                </Label>
+                <ul className="mt-2 space-y-1 text-sm">
+                  {importResult.updated.map((u) => (
+                    <li key={u.mobileId} className="flex justify-between gap-2">
+                      <span>{u.brand} {u.phoneModel}</span>
+                      <span className="text-muted-foreground">{u.storages.join(', ')}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {importResult?.notMatched?.length > 0 && (
+              <div>
+                <Label className="text-sm font-semibold flex items-center gap-1.5 text-destructive">
+                  <AlertTriangle className="w-4 h-4" /> Couldn't match ({importResult.notMatched.length})
+                </Label>
+                <p className="text-xs text-muted-foreground mt-1">
+                  No existing product matched these — check the model name is spelled like it is in this list, or add the product first.
+                </p>
+                <ul className="mt-2 space-y-1 text-sm">
+                  {importResult.notMatched.map((n, i) => (
+                    <li key={i} className="text-muted-foreground">
+                      Row {n.row}: "{n.modelName}" {n.storage}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {importResult?.skippedRows?.length > 0 && (
+              <div>
+                <Label className="text-sm font-semibold flex items-center gap-1.5 text-warning">
+                  <AlertTriangle className="w-4 h-4" /> Skipped rows ({importResult.skippedRows.length})
+                </Label>
+                <ul className="mt-2 space-y-1 text-sm text-muted-foreground">
+                  {importResult.skippedRows.map((s, i) => (
+                    <li key={i}>Row {s.row}: {s.reason}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </AdminLayout>
   );
 }

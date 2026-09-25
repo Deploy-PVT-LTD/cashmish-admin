@@ -163,6 +163,18 @@ export const mobileApi = {
     return response.data;
   },
 
+  // Bulk grade-price import (Excel/CSV) — see backend
+  // controllers/mobileController.js#bulkImportGradePricing for the expected
+  // row format.
+  bulkImportGrades: async (file) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    const response = await api.post('/mobiles/bulk-import-grades', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    return response.data;
+  },
+
   // Mobile Requests (Super Admin)
   getRequests: async () => {
     const response = await api.get('/mobiles/requests');
