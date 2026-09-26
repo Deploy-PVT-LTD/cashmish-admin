@@ -167,14 +167,18 @@ export default function Submissions() {
 
     try {
       setShipping(true);
-      await formApi.shipLabel(shipSubmission._id, {
+      const result = await formApi.shipLabel(shipSubmission._id, {
         uspsLabelNumber: shipLabelNumber.trim(),
         labelFile: shipLabelFile,
       });
       await fetchSubmissions();
       setIsShipModalOpen(false);
       setShipSubmission(null);
-      toast.success('Label shipped — customer notified by email.');
+      if (result.emailSent) {
+        toast.success('Label shipped — customer notified by email.');
+      } else {
+        toast.warning(`Label saved, but the email failed to send${result.emailError ? `: ${result.emailError}` : ''}. Please notify the customer manually.`);
+      }
     } catch (error) {
       console.error('Error shipping label:', error);
       toast.error(error.response?.data?.message || 'Failed to ship label');
@@ -212,10 +216,14 @@ export default function Submissions() {
 
     try {
       setProcessingId(submission._id);
-      await formApi.confirmMatchAndPay(submission._id);
+      const result = await formApi.confirmMatchAndPay(submission._id);
       await fetchSubmissions();
       setSelectedSubmission(null);
-      toast.success('Confirmed — payment email sent to customer.');
+      if (result.emailSent) {
+        toast.success('Confirmed — payment email sent to customer.');
+      } else {
+        toast.warning(`Marked paid, but the confirmation email failed to send${result.emailError ? `: ${result.emailError}` : ''}. Please notify the customer manually.`);
+      }
     } catch (error) {
       console.error('Error confirming match:', error);
       toast.error(error.response?.data?.message || 'Failed to confirm and pay');
@@ -250,7 +258,7 @@ export default function Submissions() {
 
     try {
       setCounterSubmitting(true);
-      await formApi.setCounterOffer(counterSubmission._id, {
+      const result = await formApi.setCounterOffer(counterSubmission._id, {
         bidPrice: amount,
         reason: counterReason.trim(),
       });
@@ -258,12 +266,39 @@ export default function Submissions() {
       setIsCounterModalOpen(false);
       setCounterSubmission(null);
       setSelectedSubmission(null);
-      toast.success('Counter offer sent — customer will need to accept it by email.');
+      if (result.emailSent) {
+        toast.success('Counter offer sent — customer will need to accept it by email.');
+      } else {
+        toast.warning(`Counter offer saved, but the email failed to send${result.emailError ? `: ${result.emailError}` : ''}. The customer won't know about it until you resend.`);
+      }
     } catch (error) {
       console.error('Error setting counter offer:', error);
       toast.error(error.response?.data?.message || 'Failed to set counter offer');
     } finally {
       setCounterSubmitting(false);
+    }
+  };
+
+  // Re-send the counter-offer email as-is (same price/reason) — for when the
+  // first attempt failed to deliver (e.g. a transient email provider error).
+  const handleResendCounterOffer = async (submission) => {
+    try {
+      setProcessingId(submission._id);
+      const result = await formApi.setCounterOffer(submission._id, {
+        bidPrice: submission.bidPrice,
+        reason: submission.counterOfferReason,
+      });
+      await fetchSubmissions();
+      if (result.emailSent) {
+        toast.success('Counter offer email resent.');
+      } else {
+        toast.warning(`Still failed to send${result.emailError ? `: ${result.emailError}` : ''}. Check the customer's email address.`);
+      }
+    } catch (error) {
+      console.error('Error resending counter offer email:', error);
+      toast.error(error.response?.data?.message || 'Failed to resend');
+    } finally {
+      setProcessingId(null);
     }
   };
 
@@ -281,10 +316,14 @@ export default function Submissions() {
 
     try {
       setProcessingId(submission._id);
-      await formApi.markPaid(submission._id);
+      const result = await formApi.markPaid(submission._id);
       await fetchSubmissions();
       setSelectedSubmission(null);
-      toast.success('Marked paid — confirmation email sent.');
+      if (result.emailSent) {
+        toast.success('Marked paid — confirmation email sent.');
+      } else {
+        toast.warning(`Marked paid, but the confirmation email failed to send${result.emailError ? `: ${result.emailError}` : ''}. Please notify the customer manually.`);
+      }
     } catch (error) {
       console.error('Error marking paid:', error);
       toast.error(error.response?.data?.message || 'Failed to mark as paid');
@@ -751,8 +790,23 @@ export default function Submissions() {
                 )}
                 {selectedSubmission.counterOfferReason && (
                   <div className="p-3 bg-orange-50 border-l-4 border-orange-400 rounded-lg">
-                    <p className="text-xs text-muted-foreground mb-1">Reason given to customer</p>
-                    <p className="text-sm text-foreground">{selectedSubmission.counterOfferReason}</p>
+                    <div className="flex items-start justify-between gap-2">
+                      <div>
+                        <p className="text-xs text-muted-foreground mb-1">Reason given to customer</p>
+                        <p className="text-sm text-foreground">{selectedSubmission.counterOfferReason}</p>
+                      </div>
+                      {selectedSubmission.counterOfferStatus === 'pending_acceptance' && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="flex-shrink-0"
+                          onClick={() => handleResendCounterOffer(selectedSubmission)}
+                          disabled={processingId === selectedSubmission._id}
+                        >
+                          {processingId === selectedSubmission._id ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Resend Email'}
+                        </Button>
+                      )}
+                    </div>
                   </div>
                 )}
               </div>
