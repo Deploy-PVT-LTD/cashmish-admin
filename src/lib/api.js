@@ -267,6 +267,13 @@ export const formApi = {
     return response.data;
   },
 
+  // Re-send the counter-offer email exactly as-is (no price/reason change,
+  // so the link already emailed to the customer keeps working).
+  resendCounterOffer: async (id) => {
+    const response = await api.put(`/forms/${id}/resend-counter-offer`);
+    return response.data;
+  },
+
   // Stage 4 — admin has actually sent the money after an accepted counter offer.
   markPaid: async (id) => {
     const response = await api.put(`/forms/${id}/mark-paid`);

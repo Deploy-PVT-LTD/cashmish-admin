@@ -284,10 +284,7 @@ export default function Submissions() {
   const handleResendCounterOffer = async (submission) => {
     try {
       setProcessingId(submission._id);
-      const result = await formApi.setCounterOffer(submission._id, {
-        bidPrice: submission.bidPrice,
-        reason: submission.counterOfferReason,
-      });
+      const result = await formApi.resendCounterOffer(submission._id);
       await fetchSubmissions();
       if (result.emailSent) {
         toast.success('Counter offer email resent.');
