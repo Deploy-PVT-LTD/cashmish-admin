@@ -5,6 +5,7 @@ import { AdminLayout } from '@/components/layout/AdminLayout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import {
   Dialog,
   DialogContent,
@@ -18,7 +19,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Search, Eye, ChevronLeft, ChevronRight, Loader2, MapPin, Phone, Download, X, DollarSign, RefreshCw, Pencil, AlertCircle, Trash2, Landmark, Mail, FileText, Upload, PartyPopper } from 'lucide-react';
+import { Search, Eye, Loader2, MapPin, Phone, Download, X, DollarSign, RefreshCw, AlertCircle, Trash2, Landmark, Mail, FileText, Upload, PartyPopper, Package, PackageCheck, CheckCircle2, Banknote } from 'lucide-react';
 import Swal from 'sweetalert2';
 import { toast } from 'sonner';
 import { formApi } from '@/lib/api';
@@ -41,14 +42,22 @@ export default function Submissions() {
   // Image viewer state
   const [viewingImage, setViewingImage] = useState(null);
 
-  // Counter offer modal state
-  const [isBidModalOpen, setIsBidModalOpen] = useState(false);
-  const [bidSubmission, setBidSubmission] = useState(null);
-  const [bidPrice, setBidPrice] = useState('');
-  const [bidding, setBidding] = useState(false);
-  const [isEditingBid, setIsEditingBid] = useState(false);
-  const [uspsLabelNumber, setUspsLabelNumber] = useState('');
-  const [labelFile, setLabelFile] = useState(null);
+  // Stage 1 — Ship Label modal state
+  const [isShipModalOpen, setIsShipModalOpen] = useState(false);
+  const [shipSubmission, setShipSubmission] = useState(null);
+  const [shipLabelNumber, setShipLabelNumber] = useState('');
+  const [shipLabelFile, setShipLabelFile] = useState(null);
+  const [shipping, setShipping] = useState(false);
+
+  // Stage 3b — Counter Offer (with reason) modal state
+  const [isCounterModalOpen, setIsCounterModalOpen] = useState(false);
+  const [counterSubmission, setCounterSubmission] = useState(null);
+  const [counterPrice, setCounterPrice] = useState('');
+  const [counterReason, setCounterReason] = useState('');
+  const [counterSubmitting, setCounterSubmitting] = useState(false);
+
+  // Simple one-click stage transitions (mark received / confirm & pay / mark paid)
+  const [processingId, setProcessingId] = useState(null);
 
   // Customer accepted a differing counter offer — pops up once per submission
   // until the admin acknowledges it.
@@ -137,56 +146,150 @@ export default function Submissions() {
     }
   };
 
-  const handlePlaceBid = async () => {
-    if (!bidSubmission || !bidPrice) return;
+  // ── Stage 1: Ship Label ─────────────────────────────────────────────────
+  const openShipModal = (submission) => {
+    setShipSubmission(submission);
+    setShipLabelNumber('');
+    setShipLabelFile(null);
+    setIsShipModalOpen(true);
+  };
 
-    const bidAmount = parseFloat(bidPrice);
-    if (bidAmount <= 0) {
-      toast.error('Counter offer must be greater than 0');
+  const handleShipLabel = async () => {
+    if (!shipSubmission) return;
+    if (!shipLabelNumber.trim()) {
+      toast.error('USPS tracking number is required');
       return;
     }
-
-    if (bidAmount > (bidSubmission?.estimatedPrice || Infinity)) {
-      toast.error('Counter offer cannot be higher than the estimated price');
-      return;
-    }
-
-    const alreadyHasLabel = Boolean(bidSubmission.uspsLabelUrl);
-    if (!uspsLabelNumber.trim()) {
-      toast.error('USPS label tracking number is required');
-      return;
-    }
-    if (!labelFile && !alreadyHasLabel) {
+    if (!shipLabelFile) {
       toast.error('Please upload the USPS shipping label PDF');
       return;
     }
 
     try {
-      setBidding(true);
-      const response = await formApi.setCounterOffer(bidSubmission._id, {
-        bidPrice: bidAmount,
-        uspsLabelNumber: uspsLabelNumber.trim(),
-        labelFile,
+      setShipping(true);
+      await formApi.shipLabel(shipSubmission._id, {
+        uspsLabelNumber: shipLabelNumber.trim(),
+        labelFile: shipLabelFile,
       });
-      console.log('Counter offer response:', response);
       await fetchSubmissions();
-      setIsBidModalOpen(false);
-      setBidSubmission(null);
-      setBidPrice('');
-      setUspsLabelNumber('');
-      setLabelFile(null);
-      setIsEditingBid(false);
-      const matchesEstimate = bidAmount === bidSubmission.estimatedPrice;
-      toast.success(
-        matchesEstimate
-          ? 'Counter offer set — customer notified, no acceptance needed.'
-          : 'Counter offer sent — customer will need to accept it by email.'
-      );
+      setIsShipModalOpen(false);
+      setShipSubmission(null);
+      toast.success('Label shipped — customer notified by email.');
+    } catch (error) {
+      console.error('Error shipping label:', error);
+      toast.error(error.response?.data?.message || 'Failed to ship label');
+    } finally {
+      setShipping(false);
+    }
+  };
+
+  // ── Stage 2: Mark Received ──────────────────────────────────────────────
+  const handleMarkReceived = async (submission) => {
+    try {
+      setProcessingId(submission._id);
+      await formApi.markReceived(submission._id);
+      await fetchSubmissions();
+      toast.success('Marked as received.');
+    } catch (error) {
+      console.error('Error marking received:', error);
+      toast.error(error.response?.data?.message || 'Failed to mark as received');
+    } finally {
+      setProcessingId(null);
+    }
+  };
+
+  // ── Stage 3a: Confirm Match & Pay ───────────────────────────────────────
+  const handleConfirmMatchAndPay = async (submission) => {
+    const result = await Swal.fire({
+      title: 'Confirm match & mark paid?',
+      html: `This pays the full estimated price of <strong>$${submission.estimatedPrice?.toLocaleString()}</strong> and emails the customer a payment confirmation. Only do this after actually sending the money.`,
+      icon: 'question',
+      showCancelButton: true,
+      confirmButtonColor: '#16a34a',
+      confirmButtonText: 'Yes, confirm & pay'
+    });
+    if (!result.isConfirmed) return;
+
+    try {
+      setProcessingId(submission._id);
+      await formApi.confirmMatchAndPay(submission._id);
+      await fetchSubmissions();
+      setSelectedSubmission(null);
+      toast.success('Confirmed — payment email sent to customer.');
+    } catch (error) {
+      console.error('Error confirming match:', error);
+      toast.error(error.response?.data?.message || 'Failed to confirm and pay');
+    } finally {
+      setProcessingId(null);
+    }
+  };
+
+  // ── Stage 3b: Counter Offer (with reason) ───────────────────────────────
+  const openCounterModal = (submission) => {
+    setCounterSubmission(submission);
+    setCounterPrice(submission.estimatedPrice?.toString() || '');
+    setCounterReason('');
+    setIsCounterModalOpen(true);
+  };
+
+  const isCounterPriceValid = counterPrice && parseFloat(counterPrice) > 0;
+  const showCounterPriceError = counterPrice !== '' && parseFloat(counterPrice) <= 0;
+
+  const handleSetCounterOffer = async () => {
+    if (!counterSubmission || !counterPrice) return;
+
+    const amount = parseFloat(counterPrice);
+    if (amount <= 0) {
+      toast.error('Counter offer must be greater than 0');
+      return;
+    }
+    if (!counterReason.trim()) {
+      toast.error('Please explain why the price is different — this is shown to the customer');
+      return;
+    }
+
+    try {
+      setCounterSubmitting(true);
+      await formApi.setCounterOffer(counterSubmission._id, {
+        bidPrice: amount,
+        reason: counterReason.trim(),
+      });
+      await fetchSubmissions();
+      setIsCounterModalOpen(false);
+      setCounterSubmission(null);
+      setSelectedSubmission(null);
+      toast.success('Counter offer sent — customer will need to accept it by email.');
     } catch (error) {
       console.error('Error setting counter offer:', error);
       toast.error(error.response?.data?.message || 'Failed to set counter offer');
     } finally {
-      setBidding(false);
+      setCounterSubmitting(false);
+    }
+  };
+
+  // ── Stage 4: Mark Paid (after an accepted counter offer) ────────────────
+  const handleMarkPaid = async (submission) => {
+    const result = await Swal.fire({
+      title: 'Mark as paid?',
+      html: `This emails the customer a payment confirmation for <strong>$${submission.bidPrice?.toLocaleString()}</strong>. Only do this after actually sending the money.`,
+      icon: 'question',
+      showCancelButton: true,
+      confirmButtonColor: '#16a34a',
+      confirmButtonText: 'Yes, mark paid'
+    });
+    if (!result.isConfirmed) return;
+
+    try {
+      setProcessingId(submission._id);
+      await formApi.markPaid(submission._id);
+      await fetchSubmissions();
+      setSelectedSubmission(null);
+      toast.success('Marked paid — confirmation email sent.');
+    } catch (error) {
+      console.error('Error marking paid:', error);
+      toast.error(error.response?.data?.message || 'Failed to mark as paid');
+    } finally {
+      setProcessingId(null);
     }
   };
 
@@ -202,39 +305,6 @@ export default function Submissions() {
     } finally {
       setAckingAcceptance(false);
     }
-  };
-
-  const handleCancelBid = async () => {
-    if (!bidSubmission) return;
-
-    try {
-      setBidding(true);
-      const bidData = {
-        bidPrice: 0,
-        status: 'pending'
-      };
-      await formApi.placeBid(bidSubmission._id, bidData);
-      await fetchSubmissions();
-      setIsBidModalOpen(false);
-      setBidSubmission(null);
-      setBidPrice('');
-      setIsEditingBid(false);
-      toast.success('Bid cancelled successfully!');
-    } catch (error) {
-      console.error('Error cancelling bid:', error);
-      toast.error('Failed to cancel bid');
-    } finally {
-      setBidding(false);
-    }
-  };
-
-  const openBidModal = (submission, isEdit = false) => {
-    setBidSubmission(submission);
-    setBidPrice(submission.bidPrice > 0 ? submission.bidPrice.toString() : (submission.estimatedPrice?.toString() || ''));
-    setUspsLabelNumber(submission.uspsLabelNumber || '');
-    setLabelFile(null);
-    setIsEditingBid(isEdit);
-    setIsBidModalOpen(true);
   };
 
   const downloadImage = async (imageUrl, index) => {
@@ -260,11 +330,17 @@ export default function Submissions() {
     switch (status) {
       case 'pending':
         return <span className="badge-pending">Pending</span>;
+      case 'in_transit':
+        return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-700">In Transit</span>;
+      case 'received':
+        return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-700">Received</span>;
       case 'accepted':
         return <span className="badge-accepted">Accepted</span>;
+      case 'paid':
+        return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-700">Paid</span>;
       case 'rejected':
         return <span className="badge-rejected">Rejected</span>;
-      case 'bid_placed':
+      case 'bid_placed': // legacy value, kept for older records
         return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-info/10 text-info">Counter Offer Sent</span>;
       default:
         return <span className="badge-pending">{status}</span>;
@@ -281,8 +357,8 @@ export default function Submissions() {
   };
 
   // A = best condition ... F = worst. Not shown to the customer — only here, to
-  // the admin — so bids/inspection can be judged against the exact grade the
-  // system priced the offer at.
+  // the admin — so counter offers/inspection can be judged against the exact
+  // grade the system priced the offer at.
   const GRADE_COLORS = {
     A: 'bg-emerald-100 text-emerald-700 border-emerald-200',
     B: 'bg-green-100 text-green-700 border-green-200',
@@ -300,9 +376,20 @@ export default function Submissions() {
     );
   };
 
-  // Check if bid is valid
-  const isBidValid = bidPrice && parseFloat(bidPrice) > 0;
-  const showBidError = bidPrice !== '' && parseFloat(bidPrice) <= 0;
+  // Payment details block — reused in the detail modal and the acceptance popup.
+  const PaymentDetails = ({ submission }) => (
+    submission.paymentMethod === 'zelle' ? (
+      <p className="text-foreground text-sm flex items-center gap-1"><Mail className="w-3 h-3" /> Zelle — {submission.zelleDetails?.contact || 'N/A'}</p>
+    ) : submission.paymentMethod === 'bank' ? (
+      <div className="text-foreground text-sm space-y-0.5">
+        <p className="font-medium flex items-center gap-1"><Landmark className="w-3 h-3" /> {submission.bankAccountDetails?.accountHolderName}</p>
+        <p className="text-muted-foreground">Routing: {submission.bankAccountDetails?.routingNumber}</p>
+        <p className="text-muted-foreground">Account: {submission.bankAccountDetails?.accountNumber} ({submission.bankAccountDetails?.accountType})</p>
+      </div>
+    ) : (
+      <p className="text-foreground font-medium">Not selected</p>
+    )
+  );
 
   // Loading check moved inside render to keep inputs mounted
 
@@ -320,15 +407,17 @@ export default function Submissions() {
           />
         </div>
         <Select value={statusFilter} onValueChange={setStatusFilter}>
-          <SelectTrigger className="w-full sm:w-40 bg-card">
+          <SelectTrigger className="w-full sm:w-44 bg-card">
             <SelectValue placeholder="Filter by status" />
           </SelectTrigger>
           <SelectContent className="bg-card border-border z-50">
             <SelectItem value="all">All Status</SelectItem>
             <SelectItem value="pending">Pending</SelectItem>
+            <SelectItem value="in_transit">In Transit</SelectItem>
+            <SelectItem value="received">Received</SelectItem>
             <SelectItem value="accepted">Accepted</SelectItem>
+            <SelectItem value="paid">Paid</SelectItem>
             <SelectItem value="rejected">Rejected</SelectItem>
-            <SelectItem value="bid_placed">Counter Offer Sent</SelectItem>
           </SelectContent>
         </Select>
         <Button variant="outline" onClick={fetchSubmissions}>
@@ -390,7 +479,7 @@ export default function Submissions() {
                     </div>
                   )}
                 </div>
-                <div className="mt-4 pt-3 border-t border-border flex gap-2">
+                <div className="mt-4 pt-3 border-t border-border flex flex-wrap gap-2">
                   {!submission.isDeleted && (
                     <>
                       <Button variant="outline" size="sm" className="flex-1" onClick={() => setSelectedSubmission(submission)}>
@@ -398,15 +487,21 @@ export default function Submissions() {
                         View
                       </Button>
                       {submission.status === 'pending' && (
-                        <Button size="sm" className="flex-1 bg-info hover:bg-info/90" onClick={() => openBidModal(submission)}>
-                          <DollarSign className="w-4 h-4 mr-2" />
-                          Counter Offer
+                        <Button size="sm" className="flex-1 bg-info hover:bg-info/90" onClick={() => openShipModal(submission)}>
+                          <Package className="w-4 h-4 mr-2" />
+                          Ship Label
                         </Button>
                       )}
-                      {submission.bidPrice > 0 && ['pending', 'bid_placed'].includes(submission.status) && (
-                        <Button size="sm" variant="outline" className="flex-1" onClick={() => openBidModal(submission, true)}>
-                          <Pencil className="w-4 h-4 mr-2" />
-                          Edit
+                      {submission.status === 'in_transit' && (
+                        <Button size="sm" className="flex-1 bg-info hover:bg-info/90" onClick={() => handleMarkReceived(submission)} disabled={processingId === submission._id}>
+                          {processingId === submission._id ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <PackageCheck className="w-4 h-4 mr-2" />}
+                          Mark Received
+                        </Button>
+                      )}
+                      {submission.status === 'accepted' && (
+                        <Button size="sm" className="flex-1 bg-success hover:bg-success/90" onClick={() => handleMarkPaid(submission)} disabled={processingId === submission._id}>
+                          {processingId === submission._id ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Banknote className="w-4 h-4 mr-2" />}
+                          Mark Paid
                         </Button>
                       )}
                     </>
@@ -474,13 +569,18 @@ export default function Submissions() {
                                 <Eye className="w-4 h-4" />
                               </Button>
                               {submission.status === 'pending' && (
-                                <Button variant="ghost" size="sm" className="text-info hover:text-info" onClick={() => openBidModal(submission)}>
-                                  <DollarSign className="w-4 h-4" />
+                                <Button variant="ghost" size="sm" className="text-info hover:text-info" onClick={() => openShipModal(submission)} title="Ship label">
+                                  <Package className="w-4 h-4" />
                                 </Button>
                               )}
-                              {submission.bidPrice > 0 && ['pending', 'bid_placed'].includes(submission.status) && (
-                                <Button variant="ghost" size="sm" className="text-warning hover:text-warning" onClick={() => openBidModal(submission, true)}>
-                                  <Pencil className="w-4 h-4" />
+                              {submission.status === 'in_transit' && (
+                                <Button variant="ghost" size="sm" className="text-info hover:text-info" onClick={() => handleMarkReceived(submission)} disabled={processingId === submission._id} title="Mark received">
+                                  {processingId === submission._id ? <Loader2 className="w-4 h-4 animate-spin" /> : <PackageCheck className="w-4 h-4" />}
+                                </Button>
+                              )}
+                              {submission.status === 'accepted' && (
+                                <Button variant="ghost" size="sm" className="text-success hover:text-success" onClick={() => handleMarkPaid(submission)} disabled={processingId === submission._id} title="Mark paid">
+                                  {processingId === submission._id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Banknote className="w-4 h-4" />}
                                 </Button>
                               )}
                               <Button variant="ghost" size="sm" className="text-red-400 hover:text-red-600 hover:bg-red-50" onClick={() => handleSoftDelete(submission._id)}>
@@ -538,22 +638,8 @@ export default function Submissions() {
                   <p className="text-foreground font-medium truncate">{selectedSubmission.pickUpDetails?.email}</p>
                 </div>
                 <div>
-                  <p className="text-sm text-muted-foreground">Payment Method</p>
-                  {selectedSubmission.paymentMethod === 'zelle' ? (
-                    <p className="text-foreground font-medium flex items-center gap-1">
-                      <Mail className="w-3 h-3" />
-                      Zelle — {selectedSubmission.zelleDetails?.contact || 'N/A'}
-                    </p>
-                  ) : selectedSubmission.paymentMethod === 'bank' ? (
-                    <div className="text-foreground text-sm">
-                      <p className="font-medium flex items-center gap-1"><Landmark className="w-3 h-3" /> Bank Account</p>
-                      <p className="text-muted-foreground mt-1">{selectedSubmission.bankAccountDetails?.accountHolderName}</p>
-                      <p className="text-muted-foreground">Routing: {selectedSubmission.bankAccountDetails?.routingNumber}</p>
-                      <p className="text-muted-foreground">Account: {selectedSubmission.bankAccountDetails?.accountNumber} ({selectedSubmission.bankAccountDetails?.accountType})</p>
-                    </div>
-                  ) : (
-                    <p className="text-foreground font-medium">Not selected</p>
-                  )}
+                  <p className="text-sm text-muted-foreground mb-1">Payment Method</p>
+                  <PaymentDetails submission={selectedSubmission} />
                 </div>
               </div>
 
@@ -580,7 +666,7 @@ export default function Submissions() {
               <div className="p-3 bg-muted/30 rounded-lg">
                 <p className="text-sm text-muted-foreground flex items-center gap-1 mb-1">
                   <MapPin className="w-3 h-3" />
-                  Pickup Address
+                  Address
                 </p>
                 <p className="text-foreground">{selectedSubmission.pickUpDetails?.address?.addressText || 'No address'}</p>
               </div>
@@ -648,7 +734,7 @@ export default function Submissions() {
                 </div>
               )}
 
-              {/* Price & Bid */}
+              {/* Price & Counter Offer */}
               <div className="space-y-3">
                 <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 bg-primary/5 border border-primary/20 rounded-lg gap-2">
                   <div className="flex items-center gap-3">
@@ -660,66 +746,65 @@ export default function Submissions() {
                 {selectedSubmission.bidPrice > 0 && (
                   <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 bg-info/5 border border-info/20 rounded-lg gap-2">
                     <span className="text-foreground font-medium">Counter Offer</span>
-                    <div className="flex items-center gap-2">
-                      <span className="text-2xl font-bold text-info">${selectedSubmission.bidPrice?.toLocaleString()}</span>
-                      {['pending', 'bid_placed'].includes(selectedSubmission.status) && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="text-warning hover:text-warning"
-                          onClick={() => {
-                            setSelectedSubmission(null);
-                            openBidModal(selectedSubmission, true);
-                          }}
-                        >
-                          <Pencil className="w-4 h-4" />
-                        </Button>
-                      )}
-                    </div>
+                    <span className="text-2xl font-bold text-info">${selectedSubmission.bidPrice?.toLocaleString()}</span>
+                  </div>
+                )}
+                {selectedSubmission.counterOfferReason && (
+                  <div className="p-3 bg-orange-50 border-l-4 border-orange-400 rounded-lg">
+                    <p className="text-xs text-muted-foreground mb-1">Reason given to customer</p>
+                    <p className="text-sm text-foreground">{selectedSubmission.counterOfferReason}</p>
                   </div>
                 )}
               </div>
 
-              {/* Actions */}
-              {selectedSubmission.status === 'pending' && (
+              {/* Stage actions, based on current status */}
+              {!selectedSubmission.isDeleted && (
                 <div className="flex flex-col sm:flex-row gap-3">
-                  <Button
-                    className="flex-1 bg-info hover:bg-info/90"
-                    onClick={() => {
-                      const sub = selectedSubmission;
-                      setSelectedSubmission(null);
-                      openBidModal(sub);
-                    }}
-                  >
-                    <DollarSign className="w-4 h-4 mr-2" />
-                    Set Counter Offer
-                  </Button>
-                  <Button
-                    variant="outline"
-                    className="flex-1 border-destructive text-destructive hover:bg-destructive hover:text-destructive-foreground"
-                    onClick={() => updateStatus(selectedSubmission._id, 'rejected')}
-                    disabled={updating}
-                  >
-                    {updating ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
-                    Reject
-                  </Button>
-                </div>
-              )}
+                  {selectedSubmission.status === 'pending' && (
+                    <>
+                      <Button className="flex-1 bg-info hover:bg-info/90" onClick={() => { const sub = selectedSubmission; setSelectedSubmission(null); openShipModal(sub); }}>
+                        <Package className="w-4 h-4 mr-2" />
+                        Ship Label
+                      </Button>
+                      <Button
+                        variant="outline"
+                        className="flex-1 border-destructive text-destructive hover:bg-destructive hover:text-destructive-foreground"
+                        onClick={() => updateStatus(selectedSubmission._id, 'rejected')}
+                        disabled={updating}
+                      >
+                        {updating ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
+                        Reject
+                      </Button>
+                    </>
+                  )}
 
-              {/* Edit Bid Button for already bid items */}
-              {selectedSubmission.bidPrice > 0 && ['pending', 'bid_placed'].includes(selectedSubmission.status) && (
-                <Button
-                  variant="outline"
-                  className="w-full"
-                  onClick={() => {
-                    const sub = selectedSubmission;
-                    setSelectedSubmission(null);
-                    openBidModal(sub, true);
-                  }}
-                >
-                  <Pencil className="w-4 h-4 mr-2" />
-                  Edit Counter Offer
-                </Button>
+                  {selectedSubmission.status === 'in_transit' && (
+                    <Button className="flex-1 bg-info hover:bg-info/90" onClick={() => handleMarkReceived(selectedSubmission)} disabled={processingId === selectedSubmission._id}>
+                      {processingId === selectedSubmission._id ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <PackageCheck className="w-4 h-4 mr-2" />}
+                      Mark as Received
+                    </Button>
+                  )}
+
+                  {selectedSubmission.status === 'received' && (
+                    <>
+                      <Button className="flex-1 bg-success hover:bg-success/90" onClick={() => handleConfirmMatchAndPay(selectedSubmission)} disabled={processingId === selectedSubmission._id}>
+                        {processingId === selectedSubmission._id ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <CheckCircle2 className="w-4 h-4 mr-2" />}
+                        Confirm Match & Pay
+                      </Button>
+                      <Button variant="outline" className="flex-1" onClick={() => { const sub = selectedSubmission; setSelectedSubmission(null); openCounterModal(sub); }}>
+                        <DollarSign className="w-4 h-4 mr-2" />
+                        Send Counter Offer
+                      </Button>
+                    </>
+                  )}
+
+                  {selectedSubmission.status === 'accepted' && (
+                    <Button className="flex-1 bg-success hover:bg-success/90" onClick={() => handleMarkPaid(selectedSubmission)} disabled={processingId === selectedSubmission._id}>
+                      {processingId === selectedSubmission._id ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Banknote className="w-4 h-4 mr-2" />}
+                      Mark Paid
+                    </Button>
+                  )}
+                </div>
               )}
             </div>
           )}
@@ -763,74 +848,39 @@ export default function Submissions() {
         </DialogContent>
       </Dialog>
 
-      {/* Counter Offer Modal */}
-      <Dialog open={isBidModalOpen} onOpenChange={(open) => {
-        setIsBidModalOpen(open);
+      {/* Stage 1: Ship Label Modal */}
+      <Dialog open={isShipModalOpen} onOpenChange={(open) => {
+        setIsShipModalOpen(open);
         if (!open) {
-          setIsEditingBid(false);
-          setBidPrice('');
-          setUspsLabelNumber('');
-          setLabelFile(null);
+          setShipSubmission(null);
+          setShipLabelNumber('');
+          setShipLabelFile(null);
         }
       }}>
         <DialogContent className="bg-card max-w-md">
           <DialogHeader>
-            <DialogTitle>{isEditingBid ? 'Edit Counter Offer' : 'Set Counter Offer'}</DialogTitle>
+            <DialogTitle>Ship USPS Label</DialogTitle>
           </DialogHeader>
-          {bidSubmission && (
+          {shipSubmission && (
             <div className="space-y-4 mt-4">
               <div className="p-4 bg-muted/50 rounded-lg">
                 <h4 className="font-semibold text-foreground truncate">
-                  {bidSubmission.mobileId?.brand} {bidSubmission.mobileId?.phoneModel}
+                  {shipSubmission.mobileId?.brand} {shipSubmission.mobileId?.phoneModel}
                 </h4>
-                <p className="text-sm text-muted-foreground">{bidSubmission.storage} • {bidSubmission.pickUpDetails?.fullName}</p>
+                <p className="text-sm text-muted-foreground">{shipSubmission.storage} • {shipSubmission.pickUpDetails?.fullName}</p>
               </div>
 
               <div className="p-3 bg-primary/5 border border-primary/20 rounded-lg">
-                <p className="text-sm text-muted-foreground">System Estimated Price</p>
-                <p className="text-xl font-bold text-primary">${bidSubmission.estimatedPrice?.toLocaleString() || 'N/A'}</p>
-              </div>
-
-              {isEditingBid && bidSubmission.bidPrice > 0 && (
-                <div className="p-3 bg-info/5 border border-info/20 rounded-lg">
-                  <p className="text-sm text-muted-foreground">Current Counter Offer</p>
-                  <p className="text-xl font-bold text-info">${bidSubmission.bidPrice?.toLocaleString()}</p>
-                </div>
-              )}
-
-              <div className="space-y-2">
-                <Label>Counter Offer Amount ($)</Label>
-                <Input
-                  type="number"
-                  min="1"
-                  placeholder="Enter the counter offer amount"
-                  value={bidPrice}
-                  onChange={(e) => setBidPrice(e.target.value)}
-                  className={showBidError ? 'border-destructive' : ''}
-                />
-                {showBidError && (
-                  <p className="text-sm text-destructive flex items-center gap-1">
-                    <AlertCircle className="w-4 h-4" />
-                    Counter offer must be greater than 0
-                  </p>
-                )}
-                {isBidValid && bidSubmission.estimatedPrice && (
-                  <p className={`text-sm font-medium ${parseFloat(bidPrice) < bidSubmission.estimatedPrice ? 'text-success' : 'text-warning'}`}>
-                    {parseFloat(bidPrice) < bidSubmission.estimatedPrice
-                      ? `$${(bidSubmission.estimatedPrice - parseFloat(bidPrice)).toLocaleString()} below estimate — customer will need to accept this by email`
-                      : parseFloat(bidPrice) > bidSubmission.estimatedPrice
-                        ? `$${(parseFloat(bidPrice) - bidSubmission.estimatedPrice).toLocaleString()} above estimate — customer will need to accept this by email`
-                        : 'Same as estimate — customer will just be notified, no acceptance needed'}
-                  </p>
-                )}
+                <p className="text-sm text-muted-foreground">Estimated Price (sent provisionally in the email)</p>
+                <p className="text-xl font-bold text-primary">${shipSubmission.estimatedPrice?.toLocaleString() || 'N/A'}</p>
               </div>
 
               <div className="space-y-2">
-                <Label>USPS Label Tracking Number</Label>
+                <Label>USPS Tracking Number</Label>
                 <Input
                   placeholder="e.g. 9400111899223197428490"
-                  value={uspsLabelNumber}
-                  onChange={(e) => setUspsLabelNumber(e.target.value)}
+                  value={shipLabelNumber}
+                  onChange={(e) => setShipLabelNumber(e.target.value)}
                 />
               </div>
 
@@ -838,50 +888,101 @@ export default function Submissions() {
                 <Label>USPS Label PDF</Label>
                 <label className="flex items-center gap-2 border border-dashed border-border rounded-lg px-3 py-2.5 text-sm text-muted-foreground cursor-pointer hover:bg-muted/30 transition-colors">
                   <Upload className="w-4 h-4 flex-shrink-0" />
-                  <span className="truncate">{labelFile ? labelFile.name : (bidSubmission.uspsLabelUrl ? 'Replace uploaded label (optional)' : 'Upload label PDF')}</span>
+                  <span className="truncate">{shipLabelFile ? shipLabelFile.name : 'Upload label PDF'}</span>
                   <input
                     type="file"
                     accept="application/pdf"
                     className="hidden"
-                    onChange={(e) => setLabelFile(e.target.files?.[0] || null)}
+                    onChange={(e) => setShipLabelFile(e.target.files?.[0] || null)}
                   />
                 </label>
-                {bidSubmission.uspsLabelUrl && !labelFile && (
-                  <a href={bidSubmission.uspsLabelUrl} target="_blank" rel="noreferrer" className="text-xs text-primary hover:underline inline-flex items-center gap-1">
-                    <FileText className="w-3 h-3" /> View currently uploaded label
-                  </a>
+              </div>
+
+              <p className="text-xs text-muted-foreground">
+                This sends the customer a provisional email: "if your device matches what you told us, you'll be paid within 48 hours of us receiving it."
+              </p>
+
+              <Button onClick={handleShipLabel} className="w-full bg-info hover:bg-info/90" disabled={shipping}>
+                {shipping ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Package className="w-4 h-4 mr-2" />}
+                {shipping ? 'Sending...' : 'Ship Label & Notify Customer'}
+              </Button>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Stage 3b: Counter Offer (with reason) Modal */}
+      <Dialog open={isCounterModalOpen} onOpenChange={(open) => {
+        setIsCounterModalOpen(open);
+        if (!open) {
+          setCounterSubmission(null);
+          setCounterPrice('');
+          setCounterReason('');
+        }
+      }}>
+        <DialogContent className="bg-card max-w-md">
+          <DialogHeader>
+            <DialogTitle>Send Counter Offer</DialogTitle>
+          </DialogHeader>
+          {counterSubmission && (
+            <div className="space-y-4 mt-4">
+              <div className="p-4 bg-muted/50 rounded-lg">
+                <h4 className="font-semibold text-foreground truncate">
+                  {counterSubmission.mobileId?.brand} {counterSubmission.mobileId?.phoneModel}
+                </h4>
+                <p className="text-sm text-muted-foreground">{counterSubmission.storage} • {counterSubmission.pickUpDetails?.fullName}</p>
+              </div>
+
+              <div className="p-3 bg-primary/5 border border-primary/20 rounded-lg">
+                <p className="text-sm text-muted-foreground">System Estimated Price</p>
+                <p className="text-xl font-bold text-primary">${counterSubmission.estimatedPrice?.toLocaleString() || 'N/A'}</p>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Counter Offer Amount ($)</Label>
+                <Input
+                  type="number"
+                  min="1"
+                  placeholder="Enter the revised amount"
+                  value={counterPrice}
+                  onChange={(e) => setCounterPrice(e.target.value)}
+                  className={showCounterPriceError ? 'border-destructive' : ''}
+                />
+                {showCounterPriceError && (
+                  <p className="text-sm text-destructive flex items-center gap-1">
+                    <AlertCircle className="w-4 h-4" />
+                    Counter offer must be greater than 0
+                  </p>
                 )}
               </div>
 
-              <div className="flex gap-2">
-                <Button
-                  onClick={handlePlaceBid}
-                  className="flex-1 bg-info hover:bg-info/90"
-                  disabled={bidding || !isBidValid}
-                >
-                  {bidding ? (
-                    <>
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      {isEditingBid ? 'Updating...' : 'Sending...'}
-                    </>
-                  ) : (
-                    <>
-                      <DollarSign className="w-4 h-4 mr-2" />
-                      {isEditingBid ? 'Update Counter Offer' : 'Send Counter Offer'}
-                    </>
-                  )}
-                </Button>
-                {isEditingBid && bidSubmission.bidPrice > 0 && (
-                  <Button
-                    variant="outline"
-                    className="border-destructive text-destructive hover:bg-destructive hover:text-destructive-foreground"
-                    onClick={handleCancelBid}
-                    disabled={bidding}
-                  >
-                    {bidding ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Cancel'}
-                  </Button>
-                )}
+              <div className="space-y-2">
+                <Label>Reason (shown to the customer)</Label>
+                <Textarea
+                  placeholder="e.g. You mentioned the battery was at 80%, but on inspection it needs servicing — that's why we're revising the offer."
+                  value={counterReason}
+                  onChange={(e) => setCounterReason(e.target.value)}
+                  rows={4}
+                />
               </div>
+
+              <Button
+                onClick={handleSetCounterOffer}
+                className="w-full bg-info hover:bg-info/90"
+                disabled={counterSubmitting || !isCounterPriceValid}
+              >
+                {counterSubmitting ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Sending...
+                  </>
+                ) : (
+                  <>
+                    <DollarSign className="w-4 h-4 mr-2" />
+                    Send Counter Offer
+                  </>
+                )}
+              </Button>
             </div>
           )}
         </DialogContent>
@@ -910,16 +1011,9 @@ export default function Submissions() {
               </div>
               <div>
                 <p className="text-sm text-muted-foreground mb-1">Payment Details</p>
-                {acceptedPopup.paymentMethod === 'zelle' ? (
-                  <p className="text-foreground text-sm flex items-center gap-1"><Mail className="w-3 h-3" /> Zelle — {acceptedPopup.zelleDetails?.contact}</p>
-                ) : (
-                  <div className="text-foreground text-sm space-y-0.5">
-                    <p>{acceptedPopup.bankAccountDetails?.accountHolderName}</p>
-                    <p className="text-muted-foreground">Routing: {acceptedPopup.bankAccountDetails?.routingNumber}</p>
-                    <p className="text-muted-foreground">Account: {acceptedPopup.bankAccountDetails?.accountNumber} ({acceptedPopup.bankAccountDetails?.accountType})</p>
-                  </div>
-                )}
+                <PaymentDetails submission={acceptedPopup} />
               </div>
+              <p className="text-xs text-muted-foreground">Once you've sent the money, come back and use "Mark Paid" on this submission to confirm it with the customer.</p>
               <Button className="w-full" onClick={() => handleAckAcceptance(acceptedPopup._id)} disabled={ackingAcceptance}>
                 {ackingAcceptance ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
                 Got it
@@ -928,13 +1022,6 @@ export default function Submissions() {
           )}
         </DialogContent>
       </Dialog>
-
-      {/* Info Note */}
-      {/* <div className="mt-6 p-4 bg-info/10 border border-info/20 rounded-lg">
-        <p className="text-sm text-info">
-          <strong>API Connected:</strong> Submissions are now fetched from your backend at <code className="bg-muted px-1 rounded">https://cashmish-backend.onrender.com/api/forms</code>
-        </p>
-      </div> */}
     </AdminLayout>
   );
 }

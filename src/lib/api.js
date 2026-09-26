@@ -238,15 +238,38 @@ export const formApi = {
     return response.data;
   },
 
-  // Set the counter offer + (optionally) upload the USPS return label PDF.
-  setCounterOffer: async (id, { bidPrice, uspsLabelNumber, labelFile }) => {
+  // Stage 1 — ship the USPS return label right when a submission comes in.
+  shipLabel: async (id, { uspsLabelNumber, labelFile }) => {
     const formData = new FormData();
-    formData.append('bidPrice', bidPrice);
-    if (uspsLabelNumber) formData.append('uspsLabelNumber', uspsLabelNumber);
-    if (labelFile) formData.append('label', labelFile);
-    const response = await api.put(`/forms/${id}/counter-offer`, formData, {
+    formData.append('uspsLabelNumber', uspsLabelNumber);
+    formData.append('label', labelFile);
+    const response = await api.put(`/forms/${id}/ship-label`, formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
     });
+    return response.data;
+  },
+
+  // Stage 2 — mark the device as physically received.
+  markReceived: async (id) => {
+    const response = await api.put(`/forms/${id}/mark-received`);
+    return response.data;
+  },
+
+  // Stage 3a — device matches what was declared, pay the estimate directly.
+  confirmMatchAndPay: async (id) => {
+    const response = await api.put(`/forms/${id}/confirm-paid`);
+    return response.data;
+  },
+
+  // Stage 3b — device doesn't match; send a reasoned counter offer.
+  setCounterOffer: async (id, { bidPrice, reason }) => {
+    const response = await api.put(`/forms/${id}/counter-offer`, { bidPrice, reason });
+    return response.data;
+  },
+
+  // Stage 4 — admin has actually sent the money after an accepted counter offer.
+  markPaid: async (id) => {
+    const response = await api.put(`/forms/${id}/mark-paid`);
     return response.data;
   },
 
