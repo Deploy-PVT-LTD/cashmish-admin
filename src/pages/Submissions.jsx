@@ -787,7 +787,7 @@ export default function Submissions() {
 
                   {selectedSubmission.status === 'received' && (
                     <>
-                      <Button className="flex-1 bg-success hover:bg-success/90" onClick={() => handleConfirmMatchAndPay(selectedSubmission)} disabled={processingId === selectedSubmission._id}>
+                      <Button className="flex-1 bg-success hover:bg-success/90" onClick={() => { const sub = selectedSubmission; setSelectedSubmission(null); handleConfirmMatchAndPay(sub); }} disabled={processingId === selectedSubmission._id}>
                         {processingId === selectedSubmission._id ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <CheckCircle2 className="w-4 h-4 mr-2" />}
                         Confirm Match & Pay
                       </Button>
@@ -799,7 +799,7 @@ export default function Submissions() {
                   )}
 
                   {selectedSubmission.status === 'accepted' && (
-                    <Button className="flex-1 bg-success hover:bg-success/90" onClick={() => handleMarkPaid(selectedSubmission)} disabled={processingId === selectedSubmission._id}>
+                    <Button className="flex-1 bg-success hover:bg-success/90" onClick={() => { const sub = selectedSubmission; setSelectedSubmission(null); handleMarkPaid(sub); }} disabled={processingId === selectedSubmission._id}>
                       {processingId === selectedSubmission._id ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Banknote className="w-4 h-4 mr-2" />}
                       Mark Paid
                     </Button>
