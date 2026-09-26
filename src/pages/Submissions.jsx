@@ -18,11 +18,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Search, Eye, ChevronLeft, ChevronRight, Loader2, MapPin, Phone, Calendar, Clock, Download, X, DollarSign, RefreshCw, Pencil, AlertCircle, Trash2 } from 'lucide-react';
+import { Search, Eye, ChevronLeft, ChevronRight, Loader2, MapPin, Phone, Download, X, DollarSign, RefreshCw, Pencil, AlertCircle, Trash2, Landmark, Mail, FileText, Upload, PartyPopper } from 'lucide-react';
 import Swal from 'sweetalert2';
 import { toast } from 'sonner';
 import { formApi } from '@/lib/api';
-import { format } from 'date-fns';
 
 export default function Submissions() {
   const [submissions, setSubmissions] = useState([]);
@@ -42,12 +41,19 @@ export default function Submissions() {
   // Image viewer state
   const [viewingImage, setViewingImage] = useState(null);
 
-  // Bid modal state
+  // Counter offer modal state
   const [isBidModalOpen, setIsBidModalOpen] = useState(false);
   const [bidSubmission, setBidSubmission] = useState(null);
   const [bidPrice, setBidPrice] = useState('');
   const [bidding, setBidding] = useState(false);
   const [isEditingBid, setIsEditingBid] = useState(false);
+  const [uspsLabelNumber, setUspsLabelNumber] = useState('');
+  const [labelFile, setLabelFile] = useState(null);
+
+  // Customer accepted a differing counter offer — pops up once per submission
+  // until the admin acknowledges it.
+  const [acceptedPopup, setAcceptedPopup] = useState(null);
+  const [ackingAcceptance, setAckingAcceptance] = useState(false);
 
   // Fetch submissions from API
   const fetchSubmissions = async () => {
@@ -59,15 +65,24 @@ export default function Submissions() {
         search: debouncedSearch
       });
 
+      let forms;
       if (data.pagination) {
-        setSubmissions(data.forms || []);
+        forms = data.forms || [];
+        setSubmissions(forms);
         setTotalItems(data.pagination.total);
         setTotalPages(data.pagination.pages);
       } else {
-        setSubmissions(data.forms || data || []);
-        setTotalItems((data.forms || data || []).length);
+        forms = data.forms || data || [];
+        setSubmissions(forms);
+        setTotalItems(forms.length);
         setTotalPages(1);
       }
+
+      // Surface the first not-yet-seen acceptance — the admin dismisses it,
+      // which acknowledges just that one, then the next (if any) shows up on
+      // the next refresh.
+      const unseen = forms.find((s) => s.counterOfferStatus === 'accepted' && s.acceptanceSeenByAdmin === false);
+      if (unseen) setAcceptedPopup(unseen);
     } catch (error) {
       console.error('Error fetching submissions:', error);
       toast.error(error.response?.data?.message || 'Failed to load submissions');
@@ -127,35 +142,65 @@ export default function Submissions() {
 
     const bidAmount = parseFloat(bidPrice);
     if (bidAmount <= 0) {
-      toast.error('Bid amount must be greater than 0');
+      toast.error('Counter offer must be greater than 0');
       return;
     }
 
     if (bidAmount > (bidSubmission?.estimatedPrice || Infinity)) {
-      toast.error('Bid amount cannot be higher than the estimated price');
+      toast.error('Counter offer cannot be higher than the estimated price');
+      return;
+    }
+
+    const alreadyHasLabel = Boolean(bidSubmission.uspsLabelUrl);
+    if (!uspsLabelNumber.trim()) {
+      toast.error('USPS label tracking number is required');
+      return;
+    }
+    if (!labelFile && !alreadyHasLabel) {
+      toast.error('Please upload the USPS shipping label PDF');
       return;
     }
 
     try {
       setBidding(true);
-      const bidData = {
+      const response = await formApi.setCounterOffer(bidSubmission._id, {
         bidPrice: bidAmount,
-        status: 'bid_placed'
-      };
-      console.log('Placing bid with data:', bidData);
-      const response = await formApi.placeBid(bidSubmission._id, bidData);
-      console.log('Bid response:', response);
+        uspsLabelNumber: uspsLabelNumber.trim(),
+        labelFile,
+      });
+      console.log('Counter offer response:', response);
       await fetchSubmissions();
       setIsBidModalOpen(false);
       setBidSubmission(null);
       setBidPrice('');
+      setUspsLabelNumber('');
+      setLabelFile(null);
       setIsEditingBid(false);
-      toast.success(isEditingBid ? 'Bid updated successfully!' : 'Bid placed successfully!');
+      const matchesEstimate = bidAmount === bidSubmission.estimatedPrice;
+      toast.success(
+        matchesEstimate
+          ? 'Counter offer set — customer notified, no acceptance needed.'
+          : 'Counter offer sent — customer will need to accept it by email.'
+      );
     } catch (error) {
-      console.error('Error placing bid:', error);
-      toast.error('Failed to place bid');
+      console.error('Error setting counter offer:', error);
+      toast.error(error.response?.data?.message || 'Failed to set counter offer');
     } finally {
       setBidding(false);
+    }
+  };
+
+  const handleAckAcceptance = async (id) => {
+    try {
+      setAckingAcceptance(true);
+      await formApi.ackAcceptance(id);
+      setAcceptedPopup(null);
+      await fetchSubmissions();
+    } catch (error) {
+      console.error('Error acknowledging acceptance:', error);
+      toast.error('Failed to dismiss');
+    } finally {
+      setAckingAcceptance(false);
     }
   };
 
@@ -186,6 +231,8 @@ export default function Submissions() {
   const openBidModal = (submission, isEdit = false) => {
     setBidSubmission(submission);
     setBidPrice(submission.bidPrice > 0 ? submission.bidPrice.toString() : (submission.estimatedPrice?.toString() || ''));
+    setUspsLabelNumber(submission.uspsLabelNumber || '');
+    setLabelFile(null);
     setIsEditingBid(isEdit);
     setIsBidModalOpen(true);
   };
@@ -218,7 +265,7 @@ export default function Submissions() {
       case 'rejected':
         return <span className="badge-rejected">Rejected</span>;
       case 'bid_placed':
-        return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-info/10 text-info">Bid Placed</span>;
+        return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-info/10 text-info">Counter Offer Sent</span>;
       default:
         return <span className="badge-pending">{status}</span>;
     }
@@ -281,7 +328,7 @@ export default function Submissions() {
             <SelectItem value="pending">Pending</SelectItem>
             <SelectItem value="accepted">Accepted</SelectItem>
             <SelectItem value="rejected">Rejected</SelectItem>
-            <SelectItem value="bid_placed">Bid Placed</SelectItem>
+            <SelectItem value="bid_placed">Counter Offer Sent</SelectItem>
           </SelectContent>
         </Select>
         <Button variant="outline" onClick={fetchSubmissions}>
@@ -338,7 +385,7 @@ export default function Submissions() {
                   </div>
                   {submission.bidPrice > 0 && (
                     <div className="flex justify-between">
-                      <span className="text-muted-foreground">Bid:</span>
+                      <span className="text-muted-foreground">Counter Offer:</span>
                       <span className="text-info font-bold">${submission.bidPrice?.toLocaleString()}</span>
                     </div>
                   )}
@@ -353,13 +400,13 @@ export default function Submissions() {
                       {submission.status === 'pending' && (
                         <Button size="sm" className="flex-1 bg-info hover:bg-info/90" onClick={() => openBidModal(submission)}>
                           <DollarSign className="w-4 h-4 mr-2" />
-                          Bid
+                          Counter Offer
                         </Button>
                       )}
                       {submission.bidPrice > 0 && ['pending', 'bid_placed'].includes(submission.status) && (
                         <Button size="sm" variant="outline" className="flex-1" onClick={() => openBidModal(submission, true)}>
                           <Pencil className="w-4 h-4 mr-2" />
-                          Edit Bid
+                          Edit
                         </Button>
                       )}
                     </>
@@ -386,7 +433,7 @@ export default function Submissions() {
                     <th className="text-left text-xs font-medium text-muted-foreground uppercase tracking-wider px-6 py-4">Storage</th>
                     <th className="text-left text-xs font-medium text-muted-foreground uppercase tracking-wider px-6 py-4">Grade</th>
                     <th className="text-left text-xs font-medium text-muted-foreground uppercase tracking-wider px-6 py-4">Est. Price</th>
-                    <th className="text-left text-xs font-medium text-muted-foreground uppercase tracking-wider px-6 py-4">Bid</th>
+                    <th className="text-left text-xs font-medium text-muted-foreground uppercase tracking-wider px-6 py-4">Counter Offer</th>
                     <th className="text-left text-xs font-medium text-muted-foreground uppercase tracking-wider px-6 py-4">Status</th>
                     <th className="text-right text-xs font-medium text-muted-foreground uppercase tracking-wider px-6 py-4">Actions</th>
                   </tr>
@@ -491,19 +538,43 @@ export default function Submissions() {
                   <p className="text-foreground font-medium truncate">{selectedSubmission.pickUpDetails?.email}</p>
                 </div>
                 <div>
-                  <p className="text-sm text-muted-foreground">Pickup Schedule</p>
-                  <p className="text-foreground font-medium flex items-center gap-1">
-                    <Calendar className="w-3 h-3" />
-                    {selectedSubmission.pickUpDetails?.pickUpDate
-                      ? format(new Date(selectedSubmission.pickUpDetails.pickUpDate), 'PPP')
-                      : 'Not scheduled'}
-                  </p>
-                  <p className="text-sm text-muted-foreground flex items-center gap-1">
-                    <Clock className="w-3 h-3" />
-                    {selectedSubmission.pickUpDetails?.timeSlot}
-                  </p>
+                  <p className="text-sm text-muted-foreground">Payment Method</p>
+                  {selectedSubmission.paymentMethod === 'zelle' ? (
+                    <p className="text-foreground font-medium flex items-center gap-1">
+                      <Mail className="w-3 h-3" />
+                      Zelle — {selectedSubmission.zelleDetails?.contact || 'N/A'}
+                    </p>
+                  ) : selectedSubmission.paymentMethod === 'bank' ? (
+                    <div className="text-foreground text-sm">
+                      <p className="font-medium flex items-center gap-1"><Landmark className="w-3 h-3" /> Bank Account</p>
+                      <p className="text-muted-foreground mt-1">{selectedSubmission.bankAccountDetails?.accountHolderName}</p>
+                      <p className="text-muted-foreground">Routing: {selectedSubmission.bankAccountDetails?.routingNumber}</p>
+                      <p className="text-muted-foreground">Account: {selectedSubmission.bankAccountDetails?.accountNumber} ({selectedSubmission.bankAccountDetails?.accountType})</p>
+                    </div>
+                  ) : (
+                    <p className="text-foreground font-medium">Not selected</p>
+                  )}
                 </div>
               </div>
+
+              {/* USPS Shipping Label */}
+              {(selectedSubmission.uspsLabelNumber || selectedSubmission.uspsLabelUrl) && (
+                <div className="p-3 bg-muted/30 rounded-lg flex items-center justify-between flex-wrap gap-2">
+                  <div>
+                    <p className="text-sm text-muted-foreground flex items-center gap-1 mb-1">
+                      <FileText className="w-3 h-3" />
+                      USPS Shipping Label
+                    </p>
+                    <p className="text-foreground text-sm font-medium">{selectedSubmission.uspsLabelNumber || 'No tracking number yet'}</p>
+                  </div>
+                  {selectedSubmission.uspsLabelUrl && (
+                    <Button variant="outline" size="sm" onClick={() => window.open(selectedSubmission.uspsLabelUrl, '_blank')}>
+                      <Download className="w-4 h-4 mr-2" />
+                      View Label PDF
+                    </Button>
+                  )}
+                </div>
+              )}
 
               {/* Address */}
               <div className="p-3 bg-muted/30 rounded-lg">
@@ -588,7 +659,7 @@ export default function Submissions() {
                 </div>
                 {selectedSubmission.bidPrice > 0 && (
                   <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 bg-info/5 border border-info/20 rounded-lg gap-2">
-                    <span className="text-foreground font-medium">Your Bid</span>
+                    <span className="text-foreground font-medium">Counter Offer</span>
                     <div className="flex items-center gap-2">
                       <span className="text-2xl font-bold text-info">${selectedSubmission.bidPrice?.toLocaleString()}</span>
                       {['pending', 'bid_placed'].includes(selectedSubmission.status) && (
@@ -621,7 +692,7 @@ export default function Submissions() {
                     }}
                   >
                     <DollarSign className="w-4 h-4 mr-2" />
-                    Place Bid
+                    Set Counter Offer
                   </Button>
                   <Button
                     variant="outline"
@@ -647,7 +718,7 @@ export default function Submissions() {
                   }}
                 >
                   <Pencil className="w-4 h-4 mr-2" />
-                  Edit Bid
+                  Edit Counter Offer
                 </Button>
               )}
             </div>
@@ -692,17 +763,19 @@ export default function Submissions() {
         </DialogContent>
       </Dialog>
 
-      {/* Bid Modal */}
+      {/* Counter Offer Modal */}
       <Dialog open={isBidModalOpen} onOpenChange={(open) => {
         setIsBidModalOpen(open);
         if (!open) {
           setIsEditingBid(false);
           setBidPrice('');
+          setUspsLabelNumber('');
+          setLabelFile(null);
         }
       }}>
         <DialogContent className="bg-card max-w-md">
           <DialogHeader>
-            <DialogTitle>{isEditingBid ? 'Edit Bid' : 'Place Bid'}</DialogTitle>
+            <DialogTitle>{isEditingBid ? 'Edit Counter Offer' : 'Set Counter Offer'}</DialogTitle>
           </DialogHeader>
           {bidSubmission && (
             <div className="space-y-4 mt-4">
@@ -720,17 +793,17 @@ export default function Submissions() {
 
               {isEditingBid && bidSubmission.bidPrice > 0 && (
                 <div className="p-3 bg-info/5 border border-info/20 rounded-lg">
-                  <p className="text-sm text-muted-foreground">Current Bid</p>
+                  <p className="text-sm text-muted-foreground">Current Counter Offer</p>
                   <p className="text-xl font-bold text-info">${bidSubmission.bidPrice?.toLocaleString()}</p>
                 </div>
               )}
 
               <div className="space-y-2">
-                <Label>Your Bid Price ($)</Label>
+                <Label>Counter Offer Amount ($)</Label>
                 <Input
                   type="number"
                   min="1"
-                  placeholder="Enter your bid amount"
+                  placeholder="Enter the counter offer amount"
                   value={bidPrice}
                   onChange={(e) => setBidPrice(e.target.value)}
                   className={showBidError ? 'border-destructive' : ''}
@@ -738,17 +811,45 @@ export default function Submissions() {
                 {showBidError && (
                   <p className="text-sm text-destructive flex items-center gap-1">
                     <AlertCircle className="w-4 h-4" />
-                    Bid amount must be greater than 0
+                    Counter offer must be greater than 0
                   </p>
                 )}
                 {isBidValid && bidSubmission.estimatedPrice && (
                   <p className={`text-sm font-medium ${parseFloat(bidPrice) < bidSubmission.estimatedPrice ? 'text-success' : 'text-warning'}`}>
                     {parseFloat(bidPrice) < bidSubmission.estimatedPrice
-                      ? `$${(bidSubmission.estimatedPrice - parseFloat(bidPrice)).toLocaleString()} below estimate`
+                      ? `$${(bidSubmission.estimatedPrice - parseFloat(bidPrice)).toLocaleString()} below estimate — customer will need to accept this by email`
                       : parseFloat(bidPrice) > bidSubmission.estimatedPrice
-                        ? `$${(parseFloat(bidPrice) - bidSubmission.estimatedPrice).toLocaleString()} above estimate`
-                        : 'Same as estimate'}
+                        ? `$${(parseFloat(bidPrice) - bidSubmission.estimatedPrice).toLocaleString()} above estimate — customer will need to accept this by email`
+                        : 'Same as estimate — customer will just be notified, no acceptance needed'}
                   </p>
+                )}
+              </div>
+
+              <div className="space-y-2">
+                <Label>USPS Label Tracking Number</Label>
+                <Input
+                  placeholder="e.g. 9400111899223197428490"
+                  value={uspsLabelNumber}
+                  onChange={(e) => setUspsLabelNumber(e.target.value)}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label>USPS Label PDF</Label>
+                <label className="flex items-center gap-2 border border-dashed border-border rounded-lg px-3 py-2.5 text-sm text-muted-foreground cursor-pointer hover:bg-muted/30 transition-colors">
+                  <Upload className="w-4 h-4 flex-shrink-0" />
+                  <span className="truncate">{labelFile ? labelFile.name : (bidSubmission.uspsLabelUrl ? 'Replace uploaded label (optional)' : 'Upload label PDF')}</span>
+                  <input
+                    type="file"
+                    accept="application/pdf"
+                    className="hidden"
+                    onChange={(e) => setLabelFile(e.target.files?.[0] || null)}
+                  />
+                </label>
+                {bidSubmission.uspsLabelUrl && !labelFile && (
+                  <a href={bidSubmission.uspsLabelUrl} target="_blank" rel="noreferrer" className="text-xs text-primary hover:underline inline-flex items-center gap-1">
+                    <FileText className="w-3 h-3" /> View currently uploaded label
+                  </a>
                 )}
               </div>
 
@@ -761,12 +862,12 @@ export default function Submissions() {
                   {bidding ? (
                     <>
                       <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      {isEditingBid ? 'Updating...' : 'Placing...'}
+                      {isEditingBid ? 'Updating...' : 'Sending...'}
                     </>
                   ) : (
                     <>
                       <DollarSign className="w-4 h-4 mr-2" />
-                      {isEditingBid ? 'Update Bid' : 'Place Bid'}
+                      {isEditingBid ? 'Update Counter Offer' : 'Send Counter Offer'}
                     </>
                   )}
                 </Button>
@@ -777,10 +878,52 @@ export default function Submissions() {
                     onClick={handleCancelBid}
                     disabled={bidding}
                   >
-                    {bidding ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Cancel Bid'}
+                    {bidding ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Cancel'}
                   </Button>
                 )}
               </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Customer Accepted Counter Offer — popup */}
+      <Dialog open={!!acceptedPopup} onOpenChange={(open) => { if (!open) setAcceptedPopup(null); }}>
+        <DialogContent className="bg-card max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <PartyPopper className="w-5 h-5 text-success" />
+              Customer Accepted the Counter Offer
+            </DialogTitle>
+          </DialogHeader>
+          {acceptedPopup && (
+            <div className="space-y-4 mt-2">
+              <div className="p-4 bg-muted/50 rounded-lg">
+                <h4 className="font-semibold text-foreground truncate">
+                  {acceptedPopup.mobileId?.brand} {acceptedPopup.mobileId?.phoneModel}
+                </h4>
+                <p className="text-sm text-muted-foreground">CM#{acceptedPopup.submissionId} • {acceptedPopup.pickUpDetails?.fullName}</p>
+              </div>
+              <div className="p-3 bg-success/10 border border-success/20 rounded-lg">
+                <p className="text-sm text-muted-foreground">Accepted Counter Offer</p>
+                <p className="text-xl font-bold text-success">${acceptedPopup.bidPrice?.toLocaleString()}</p>
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground mb-1">Payment Details</p>
+                {acceptedPopup.paymentMethod === 'zelle' ? (
+                  <p className="text-foreground text-sm flex items-center gap-1"><Mail className="w-3 h-3" /> Zelle — {acceptedPopup.zelleDetails?.contact}</p>
+                ) : (
+                  <div className="text-foreground text-sm space-y-0.5">
+                    <p>{acceptedPopup.bankAccountDetails?.accountHolderName}</p>
+                    <p className="text-muted-foreground">Routing: {acceptedPopup.bankAccountDetails?.routingNumber}</p>
+                    <p className="text-muted-foreground">Account: {acceptedPopup.bankAccountDetails?.accountNumber} ({acceptedPopup.bankAccountDetails?.accountType})</p>
+                  </div>
+                )}
+              </div>
+              <Button className="w-full" onClick={() => handleAckAcceptance(acceptedPopup._id)} disabled={ackingAcceptance}>
+                {ackingAcceptance ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
+                Got it
+              </Button>
             </div>
           )}
         </DialogContent>

@@ -237,6 +237,24 @@ export const formApi = {
     const response = await api.put(`/forms/${id}`, bidData);
     return response.data;
   },
+
+  // Set the counter offer + (optionally) upload the USPS return label PDF.
+  setCounterOffer: async (id, { bidPrice, uspsLabelNumber, labelFile }) => {
+    const formData = new FormData();
+    formData.append('bidPrice', bidPrice);
+    if (uspsLabelNumber) formData.append('uspsLabelNumber', uspsLabelNumber);
+    if (labelFile) formData.append('label', labelFile);
+    const response = await api.put(`/forms/${id}/counter-offer`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    return response.data;
+  },
+
+  // Dismiss the "customer accepted" popup for one submission.
+  ackAcceptance: async (id) => {
+    const response = await api.put(`/forms/${id}/ack-acceptance`);
+    return response.data;
+  },
 };
 
 // Auth/User APIs
