@@ -28,7 +28,12 @@ const api = axios.create({
     'ngrok-skip-browser-warning': 'true',
     'X-Admin-Request': 'true',
   },
-  timeout: 8000, // 8s timeout to trigger failover
+  // 30s — several admin actions (ship label, mark paid, counter offer, etc.)
+  // now upload a file to Cloudinary AND wait for the customer email to send
+  // before responding, which routinely takes longer than a few seconds on a
+  // cold Render instance. 8s was firing the timeout-retry below on requests
+  // that had actually already succeeded server-side.
+  timeout: 30000,
 });
 
 // Helper to switch URL
@@ -59,8 +64,20 @@ api.interceptors.response.use(
   async (error) => {
     const originalRequest = error.config;
 
-    // Handle Network Errors or Timeouts for Failover
-    if ((error.code === 'ERR_NETWORK' || error.code === 'ECONNABORTED') && !originalRequest._retry) {
+    // Handle Network Errors or Timeouts for Failover.
+    // ERR_NETWORK (connection never established) is safe to retry for any
+    // method. A client-side timeout (ECONNABORTED) is NOT safe to retry for
+    // a mutating request (POST/PUT/PATCH/DELETE) — the original may well
+    // have already reached and been processed by the server (this is
+    // exactly what was happening: the label/email/status update succeeded,
+    // the slow response just arrived after our timeout, and blindly
+    // retrying then hit a "this was already done" rejection). Only retry
+    // timeouts for safe, read-only GET requests.
+    const method = (originalRequest.method || 'get').toLowerCase();
+    const isMutating = method !== 'get';
+    const safeToRetry = error.code === 'ERR_NETWORK' || (error.code === 'ECONNABORTED' && !isMutating);
+
+    if (safeToRetry && !originalRequest._retry) {
       originalRequest._retry = true;
       const nextURL = switchToFallback();
       console.warn(`Backend unreachable. Switching to: ${nextURL}`);
