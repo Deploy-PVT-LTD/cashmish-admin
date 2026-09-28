@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Pagination } from '@/components/ui/Pagination';
 import { useDebounce } from '@/hooks/useDebounce';
 import { AdminLayout } from '@/components/layout/AdminLayout';
@@ -52,6 +52,10 @@ export default function Submissions() {
   const [shipLabelNumber, setShipLabelNumber] = useState('');
   const [shipLabelFile, setShipLabelFile] = useState(null);
   const [shipping, setShipping] = useState(false);
+  // Synchronous guard against a double-click firing two requests before the
+  // `shipping` state re-render disables the button (the same race pattern
+  // guarded against on the customer-facing "Confirm Pickup" button).
+  const isShippingRef = useRef(false);
 
   // Stage 3b — Counter Offer (with reason) modal state
   const [isCounterModalOpen, setIsCounterModalOpen] = useState(false);
@@ -166,6 +170,7 @@ export default function Submissions() {
 
   const handleShipLabel = async () => {
     if (!shipSubmission) return;
+    if (isShippingRef.current) return;
     if (!shipLabelNumber.trim()) {
       toast.error('USPS tracking number is required');
       return;
@@ -175,6 +180,7 @@ export default function Submissions() {
       return;
     }
 
+    isShippingRef.current = true;
     try {
       setShipping(true);
       const result = await formApi.shipLabel(shipSubmission._id, {
@@ -191,9 +197,21 @@ export default function Submissions() {
       }
     } catch (error) {
       console.error('Error shipping label:', error);
-      toast.error(error.response?.data?.message || 'Failed to ship label');
+      const message = error.response?.data?.message || 'Failed to ship label';
+      if (message.includes('already')) {
+        // This submission moved on since the modal was opened (e.g. it was
+        // already shipped a moment ago) — refresh so the admin immediately
+        // sees its real current status instead of a stuck, stale form.
+        toast.error(`${message} Refreshing this list now.`);
+        await fetchSubmissions();
+        setIsShipModalOpen(false);
+        setShipSubmission(null);
+      } else {
+        toast.error(message);
+      }
     } finally {
       setShipping(false);
+      isShippingRef.current = false;
     }
   };
 
