@@ -22,10 +22,14 @@ import {
 import { Search, Eye, Loader2, MapPin, Phone, Download, X, DollarSign, RefreshCw, AlertCircle, Trash2, Landmark, Mail, FileText, Upload, PartyPopper, Package, PackageCheck, CheckCircle2, Banknote } from 'lucide-react';
 import Swal from 'sweetalert2';
 import { toast } from 'sonner';
-import { formApi } from '@/lib/api';
+import { formApi, categoryApi } from '@/lib/api';
 
 export default function Submissions() {
   const [submissions, setSubmissions] = useState([]);
+  // All categories' assessment questions — fetched once, used to translate a
+  // submission's raw conditionAnswers (question key -> option key(s)) into
+  // the exact labels the customer saw and picked.
+  const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const debouncedSearch = useDebounce(searchTerm, 700);
@@ -103,6 +107,12 @@ export default function Submissions() {
   useEffect(() => {
     fetchSubmissions();
   }, [page, debouncedSearch]);
+
+  useEffect(() => {
+    categoryApi.getAllAdmin()
+      .then((data) => setCategories(Array.isArray(data) ? data : []))
+      .catch((error) => console.error('Error fetching categories:', error));
+  }, []);
 
   const filteredSubmissions = submissions.filter((s) => {
     const matchesStatus = statusFilter === 'all' || s.status === statusFilter;
@@ -390,6 +400,38 @@ export default function Submissions() {
       batteryCondition: { good: 'Good', average: 'Average', poor: 'Poor' },
     };
     return labels[type]?.[value] || value;
+  };
+
+  // Translates a submission's raw conditionAnswers (questionKey -> chosen
+  // optionKey, or an array of optionKeys for multi-select questions) into the
+  // exact question + option labels the customer saw, by looking up that
+  // product's category assessmentQuestions. Returns one row per question that
+  // was actually answered, in the order the customer answered them.
+  const getAnsweredQuestions = (submission) => {
+    const answers = submission.conditionAnswers;
+    if (!answers || typeof answers !== 'object' || Object.keys(answers).length === 0) return [];
+
+    const category = categories.find((c) => c.slug === submission.mobileId?.category);
+    const questions = category?.assessmentQuestions || [];
+
+    return questions
+      .map((q) => {
+        const raw = answers[q.key];
+        if (raw === undefined || raw === null || raw === '') return null;
+
+        const optionLabel = (key) => q.options?.find((o) => o.key === key)?.label || key;
+
+        let display;
+        if (Array.isArray(raw)) {
+          const chosen = raw.filter((v) => v && v !== q.noneKey);
+          display = chosen.length === 0 ? 'None' : chosen.map(optionLabel).join(', ');
+        } else {
+          display = optionLabel(raw);
+        }
+
+        return { key: q.key, question: q.label, answer: display };
+      })
+      .filter(Boolean);
   };
 
   // A = best condition ... F = worst. Not shown to the customer — only here, to
@@ -712,32 +754,51 @@ export default function Submissions() {
                 <h4 className="font-semibold text-foreground mb-3 truncate">
                   {selectedSubmission.mobileId?.brand} {selectedSubmission.mobileId?.phoneModel} • {selectedSubmission.storage}
                 </h4>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
-                  <div className="flex justify-between">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm mb-4">
+                  <div className="flex justify-between sm:block">
                     <span className="text-muted-foreground">Carrier:</span>
-                    <span className="text-foreground truncate ml-2">{selectedSubmission.carrier}</span>
+                    <span className="text-foreground truncate sm:block ml-2 sm:ml-0">{selectedSubmission.carrier}</span>
                   </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Screen:</span>
-                    <span className="text-foreground truncate ml-2">{getConditionLabel('screenCondition', selectedSubmission.screenCondition)}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Body:</span>
-                    <span className="text-foreground truncate ml-2">{getConditionLabel('bodyCondition', selectedSubmission.bodyCondition)}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Battery:</span>
-                    <span className="text-foreground">{getConditionLabel('batteryCondition', selectedSubmission.batteryCondition)}</span>
-                  </div>
-                  <div className="flex justify-between">
+                  <div className="flex justify-between sm:block">
                     <span className="text-muted-foreground">Status:</span>
-                    {getStatusBadge(selectedSubmission.status)}
+                    <span className="sm:block">{getStatusBadge(selectedSubmission.status)}</span>
                   </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Condition:</span>
-                    <span className="text-foreground truncate ml-2">{getConditionLabel('condition', selectedSubmission.condition)}</span>
+                  <div className="flex justify-between sm:block">
+                    <span className="text-muted-foreground">Overall:</span>
+                    <span className="text-foreground truncate ml-2 sm:ml-0 sm:block">{selectedSubmission.condition}</span>
                   </div>
                 </div>
+
+                {/* Every condition question the customer actually answered,
+                    exactly as they saw and picked it — pulled live from that
+                    product's category questions, not a hardcoded/stale list. */}
+                {getAnsweredQuestions(selectedSubmission).length > 0 ? (
+                  <div className="border-t border-border pt-3 space-y-2">
+                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Condition Answers</p>
+                    {getAnsweredQuestions(selectedSubmission).map((row) => (
+                      <div key={row.key} className="flex flex-col sm:flex-row sm:justify-between gap-0.5 sm:gap-2 text-sm">
+                        <span className="text-muted-foreground">{row.question}</span>
+                        <span className="text-foreground font-medium sm:text-right">{row.answer}</span>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="border-t border-border pt-3 grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
+                    {/* Older submissions predating the current question set — fall back to the legacy fields. */}
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Screen:</span>
+                      <span className="text-foreground truncate ml-2">{getConditionLabel('screenCondition', selectedSubmission.screenCondition)}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Body:</span>
+                      <span className="text-foreground truncate ml-2">{getConditionLabel('bodyCondition', selectedSubmission.bodyCondition)}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Battery:</span>
+                      <span className="text-foreground">{getConditionLabel('batteryCondition', selectedSubmission.batteryCondition)}</span>
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Images with View & Download */}
