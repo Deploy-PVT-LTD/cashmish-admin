@@ -915,7 +915,22 @@ export default function Submissions() {
                     </Button>
                   )}
 
-                  {selectedSubmission.status === 'received' && (
+                  {selectedSubmission.status === 'received' && selectedSubmission.counterOfferStatus === 'pending_acceptance' && (
+                    <div className="w-full p-3 bg-blue-50 border border-blue-200 rounded-lg text-sm text-blue-800">
+                      A counter offer of <b>${selectedSubmission.bidPrice?.toLocaleString()}</b> is out and waiting on the
+                      customer to accept it by email. Use <b>Resend Email</b> above if they need it again, or
+                      <b> Send Counter Offer</b> below to revise the amount — "Confirm Match & Pay" is hidden while an
+                      offer is pending so the original estimate can't be paid out by mistake.
+                      <div className="mt-2">
+                        <Button variant="outline" size="sm" onClick={() => { const sub = selectedSubmission; setSelectedSubmission(null); openCounterModal(sub); }}>
+                          <DollarSign className="w-4 h-4 mr-2" />
+                          Send Counter Offer
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+
+                  {selectedSubmission.status === 'received' && selectedSubmission.counterOfferStatus !== 'pending_acceptance' && (
                     <>
                       <Button className="flex-1 bg-success hover:bg-success/90" onClick={() => { const sub = selectedSubmission; setSelectedSubmission(null); handleConfirmMatchAndPay(sub); }} disabled={processingId === selectedSubmission._id}>
                         {processingId === selectedSubmission._id ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <CheckCircle2 className="w-4 h-4 mr-2" />}
