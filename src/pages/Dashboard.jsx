@@ -124,7 +124,7 @@ export default function Dashboard() {
           iconColor="text-warning"
         />
         <StatCard
-          title="Bids Placed"
+          title="Offers Accepted"
           value={stats.acceptedDeals.toString()}
           icon={CheckCircle}
           iconBgColor="bg-success/10"
