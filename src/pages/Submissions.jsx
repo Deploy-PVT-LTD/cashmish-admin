@@ -268,15 +268,26 @@ export default function Submissions() {
     setIsCounterModalOpen(true);
   };
 
-  const isCounterPriceValid = counterPrice && parseFloat(counterPrice) > 0;
-  const showCounterPriceError = counterPrice !== '' && parseFloat(counterPrice) <= 0;
+  // A counter offer only makes sense as a reduction — if it matched or beat
+  // the estimate there'd be nothing to "counter", that's what Confirm Match
+  // & Pay is for.
+  const counterPriceError = (() => {
+    if (counterPrice === '') return '';
+    const amount = parseFloat(counterPrice);
+    const estimate = counterSubmission?.estimatedPrice;
+    if (amount <= 0) return 'Counter offer must be greater than 0';
+    if (estimate !== undefined && amount >= estimate) return `Counter offer must be less than the estimated price ($${estimate.toLocaleString()})`;
+    return '';
+  })();
+  const isCounterPriceValid = counterPrice !== '' && !counterPriceError;
+  const showCounterPriceError = counterPriceError !== '';
 
   const handleSetCounterOffer = async () => {
     if (!counterSubmission || !counterPrice) return;
 
     const amount = parseFloat(counterPrice);
-    if (amount <= 0) {
-      toast.error('Counter offer must be greater than 0');
+    if (counterPriceError) {
+      toast.error(counterPriceError);
       return;
     }
     if (!counterReason.trim()) {
@@ -1088,6 +1099,7 @@ export default function Submissions() {
                 <Input
                   type="number"
                   min="1"
+                  max={counterSubmission.estimatedPrice ? counterSubmission.estimatedPrice - 1 : undefined}
                   placeholder="Enter the revised amount"
                   value={counterPrice}
                   onChange={(e) => setCounterPrice(e.target.value)}
@@ -1096,7 +1108,7 @@ export default function Submissions() {
                 {showCounterPriceError && (
                   <p className="text-sm text-destructive flex items-center gap-1">
                     <AlertCircle className="w-4 h-4" />
-                    Counter offer must be greater than 0
+                    {counterPriceError}
                   </p>
                 )}
               </div>
