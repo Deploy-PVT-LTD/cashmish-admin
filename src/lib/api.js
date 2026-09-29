@@ -297,6 +297,13 @@ export const formApi = {
     return response.data;
   },
 
+  // After a customer rejects a counter offer — call once the device has
+  // actually been shipped back to them.
+  markReturned: async (id) => {
+    const response = await api.put(`/forms/${id}/mark-returned`);
+    return response.data;
+  },
+
   // Dismiss the "customer accepted" popup for one submission.
   ackAcceptance: async (id) => {
     const response = await api.put(`/forms/${id}/ack-acceptance`);

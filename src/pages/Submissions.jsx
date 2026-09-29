@@ -368,6 +368,33 @@ export default function Submissions() {
     }
   };
 
+  // After a customer rejects a counter offer — call once the device has
+  // actually been mailed back to them.
+  const handleMarkReturned = async (submission) => {
+    const result = await Swal.fire({
+      title: 'Mark as returned?',
+      text: 'Only do this after the device has actually been shipped back to the customer.',
+      icon: 'question',
+      showCancelButton: true,
+      confirmButtonColor: '#16a34a',
+      confirmButtonText: 'Yes, mark returned'
+    });
+    if (!result.isConfirmed) return;
+
+    try {
+      setProcessingId(submission._id);
+      await formApi.markReturned(submission._id);
+      await fetchSubmissions();
+      setSelectedSubmission(null);
+      toast.success('Marked as returned.');
+    } catch (error) {
+      console.error('Error marking returned:', error);
+      toast.error(error.response?.data?.message || 'Failed to mark as returned');
+    } finally {
+      setProcessingId(null);
+    }
+  };
+
   const handleAckAcceptance = async (id) => {
     try {
       setAckingAcceptance(true);
@@ -415,6 +442,10 @@ export default function Submissions() {
         return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-700">Paid</span>;
       case 'rejected':
         return <span className="badge-rejected">Rejected</span>;
+      case 'return':
+        return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-orange-100 text-orange-700">Return Pending</span>;
+      case 'returned':
+        return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-200 text-gray-700">Returned</span>;
       case 'bid_placed': // legacy value, kept for older records
         return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-info/10 text-info">Counter Offer Sent</span>;
       default:
@@ -525,6 +556,8 @@ export default function Submissions() {
             <SelectItem value="accepted">Accepted</SelectItem>
             <SelectItem value="paid">Paid</SelectItem>
             <SelectItem value="rejected">Rejected</SelectItem>
+            <SelectItem value="return">Return Pending</SelectItem>
+            <SelectItem value="returned">Returned</SelectItem>
           </SelectContent>
         </Select>
         <Button variant="outline" onClick={fetchSubmissions}>
@@ -611,6 +644,12 @@ export default function Submissions() {
                           Mark Paid
                         </Button>
                       )}
+                      {submission.status === 'return' && (
+                        <Button size="sm" className="flex-1 bg-success hover:bg-success/90" onClick={() => handleMarkReturned(submission)} disabled={processingId === submission._id}>
+                          {processingId === submission._id ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <CheckCircle2 className="w-4 h-4 mr-2" />}
+                          Mark Returned
+                        </Button>
+                      )}
                     </>
                   )}
                   {!submission.isDeleted && (
@@ -688,6 +727,11 @@ export default function Submissions() {
                               {submission.status === 'accepted' && (
                                 <Button variant="ghost" size="sm" className="text-success hover:text-success" onClick={() => handleMarkPaid(submission)} disabled={processingId === submission._id} title="Mark paid">
                                   {processingId === submission._id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Banknote className="w-4 h-4" />}
+                                </Button>
+                              )}
+                              {submission.status === 'return' && (
+                                <Button variant="ghost" size="sm" className="text-success hover:text-success" onClick={() => handleMarkReturned(submission)} disabled={processingId === submission._id} title="Mark returned">
+                                  {processingId === submission._id ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
                                 </Button>
                               )}
                               <Button variant="ghost" size="sm" className="text-red-400 hover:text-red-600 hover:bg-red-50" onClick={() => handleSoftDelete(submission._id)}>
@@ -959,6 +1003,18 @@ export default function Submissions() {
                       {processingId === selectedSubmission._id ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Banknote className="w-4 h-4 mr-2" />}
                       Mark Paid
                     </Button>
+                  )}
+
+                  {selectedSubmission.status === 'return' && (
+                    <div className="w-full">
+                      <div className="p-3 bg-orange-50 border border-orange-200 rounded-lg text-sm text-orange-800 mb-3">
+                        Customer declined the counter offer — this device needs to be shipped back to them.
+                      </div>
+                      <Button className="w-full bg-success hover:bg-success/90" onClick={() => { const sub = selectedSubmission; setSelectedSubmission(null); handleMarkReturned(sub); }} disabled={processingId === selectedSubmission._id}>
+                        {processingId === selectedSubmission._id ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <CheckCircle2 className="w-4 h-4 mr-2" />}
+                        Mark as Returned
+                      </Button>
+                    </div>
                   )}
                 </div>
               )}
