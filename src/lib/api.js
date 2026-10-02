@@ -2,8 +2,7 @@ import axios from 'axios';
 
 // Priority List
 const BACKEND_URLS = [
-  ...(import.meta.env.DEV ? ['http://localhost:5000'] : []),
-  'https://app.cashmish.com',
+  ...(import.meta.env.DEV ? ['http://localhost:5000'] : ['https://app.cashmish.com']),
   'https://cashmish-backend.onrender.com'
 ];
 
@@ -69,7 +68,10 @@ api.interceptors.response.use(
     // timeouts for safe, read-only GET requests.
     const method = (originalRequest.method || 'get').toLowerCase();
     const isMutating = method !== 'get';
-    const safeToRetry = error.code === 'ERR_NETWORK' || (error.code === 'ECONNABORTED' && !isMutating);
+    const isGatewayFailure = [502, 503, 504].includes(error.response?.status);
+    const safeToRetry = error.code === 'ERR_NETWORK'
+      || error.response?.status === 404
+      || ((error.code === 'ECONNABORTED' || isGatewayFailure) && !isMutating);
 
     if (safeToRetry && !originalRequest._retry) {
       originalRequest._retry = true;
