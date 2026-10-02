@@ -3,20 +3,14 @@ import axios from 'axios';
 // Priority List
 const BACKEND_URLS = [
   ...(import.meta.env.DEV ? ['http://localhost:5000'] : []),
+  'https://app.cashmish.com',
   'https://cashmish-backend.onrender.com'
 ];
 
+let activeBackendURL = BACKEND_URLS[0];
+
 export const getActiveURL = () => {
-  if (typeof window === 'undefined') return BACKEND_URLS[0];
-  // In dev, always prefer localhost fresh on each load — don't honor a stale
-  // fallback pin from a previous session where localhost happened to be down
-  // (e.g. mid-restart). Only real runtime failovers within THIS session apply.
-  if (import.meta.env.DEV) return BACKEND_URLS[0];
-  const saved = sessionStorage.getItem('activeBackendURL');
-  if (saved && BACKEND_URLS.includes(saved)) {
-    return saved;
-  }
-  return BACKEND_URLS[0];
+  return activeBackendURL;
 };
 
 export const API_BASE_URL = `${getActiveURL()}/api`;
@@ -40,9 +34,9 @@ const api = axios.create({
 export const switchToFallback = () => {
   const current = getActiveURL();
   const currentIndex = BACKEND_URLS.indexOf(current);
-  const nextIndex = (currentIndex + 1) % BACKEND_URLS.length;
+  const nextIndex = Math.min(currentIndex + 1, BACKEND_URLS.length - 1);
   const nextURL = BACKEND_URLS[nextIndex];
-  sessionStorage.setItem('activeBackendURL', nextURL);
+  activeBackendURL = nextURL;
   return nextURL;
 };
 
