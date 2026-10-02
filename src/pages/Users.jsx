@@ -661,7 +661,7 @@ export default function Users() {
       {/* Info Note */}
       {/* <div className="mt-6 p-4 bg-info/10 border border-info/20 rounded-lg">
         <p className="text-sm text-info">
-          <strong>API Connected:</strong> Users fetched from <code className="bg-muted px-1 rounded">https://app.cashmish.com/api/auth/users</code>
+          <strong>API Connected:</strong> Users fetched from <code className="bg-muted px-1 rounded">https://cashmish-backend.onrender.com/api/auth/users</code>
         </p>
       </div> */}
       {/* Delete Confirmation */}

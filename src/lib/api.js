@@ -2,7 +2,7 @@ import axios from 'axios';
 
 // Priority List
 const BACKEND_URLS = [
-  import.meta.env.DEV ? 'http://localhost:5000' : 'https://app.cashmish.com'
+  import.meta.env.DEV ? 'http://localhost:5000' : 'https://cashmish-backend.onrender.com'
 ];
 
 let activeBackendURL = BACKEND_URLS[0];
